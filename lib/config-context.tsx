@@ -43,12 +43,12 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         .eq('id', user.id)
         .single()
 
-      // Load user posts
+      // Load user posts (newest first)
       const { data: postsData } = await supabase
         .from('posts')
         .select('*')
         .eq('user_id', user.id)
-        .order('id', { ascending: true })
+        .order('id', { ascending: false })
 
       // Build config from database
       const settings: GlobalSettings = settingsData ? {
