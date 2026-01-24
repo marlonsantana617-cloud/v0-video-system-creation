@@ -277,7 +277,12 @@ const handleCreatePost = async () => {
                                 <Label className="text-sm text-zinc-400">Video HLS (m3u8)</Label>
                               </div>
                               <Button 
-                                onClick={() => setEditingPost(null)} 
+                                onClick={async () => {
+                                  await saveConfig()
+                                  setEditingPost(null)
+                                  setSaved(true)
+                                  setTimeout(() => setSaved(false), 2000)
+                                }} 
                                 size="sm"
                                 className="bg-green-600 hover:bg-green-700"
                               >
