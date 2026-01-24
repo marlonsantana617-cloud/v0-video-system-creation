@@ -14,10 +14,13 @@ export interface FloatingButton {
 }
 
 export interface RedirectConfig {
-  enabled: boolean
-  url: string
-  behavior: 'behind' | 'front' | 'redirect_first'
-  cookieDuration: number // in seconds
+  // Redirect after X seconds of video playing
+  onTimeEnabled: boolean
+  onTimeSeconds: number
+  onTimeUrl: string
+  // Redirect when video ends
+  onEndEnabled: boolean
+  onEndUrl: string
 }
 
 export interface CounterConfig {
@@ -70,10 +73,11 @@ export const defaultFloatingButtons: FloatingButton[] = [
 ]
 
 export const defaultRedirect: RedirectConfig = {
-  enabled: false,
-  url: '',
-  behavior: 'behind',
-  cookieDuration: 120,
+  onTimeEnabled: false,
+  onTimeSeconds: 5,
+  onTimeUrl: '',
+  onEndEnabled: false,
+  onEndUrl: '',
 }
 
 export const defaultCounter: CounterConfig = {

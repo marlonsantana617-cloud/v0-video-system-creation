@@ -271,107 +271,16 @@ export function VideoPage() {
     loadHLS()
   }, [post, isPlaying])
 
-  // Cookie functions (use global settings)
-  const isCookieExpired = () => {
-    const cookieTimestamp = localStorage.getItem('directLinkOpenedTimestamp')
-    if (cookieTimestamp) {
-      const timestamp = parseInt(cookieTimestamp)
-      const now = Date.now()
-      const elapsed = Math.round((now - timestamp) / 1000)
-      
-      if (elapsed >= settings.redirect.cookieDuration) {
-        localStorage.removeItem('directLinkOpenedTimestamp')
-        document.cookie = "directLinkOpened=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"
-        return true
-      }
-      return false
-    }
-    
-    const cookieValue = document.cookie.replace(/(?:(?:^|.*;\s*)directLinkOpened\s*=\s*([^;]*).*$)|^.*$/, "$1")
-    return cookieValue !== "true"
-  }
+  // Track if time-based redirect already happened
+  const [timeRedirectDone, setTimeRedirectDone] = useState(false)
 
-  const markDirectLinkOpened = () => {
-    const expireDate = new Date()
-    expireDate.setTime(expireDate.getTime() + settings.redirect.cookieDuration * 1000)
-    document.cookie = `directLinkOpened=true; expires=${expireDate.toUTCString()}; path=/`
-    localStorage.setItem('directLinkOpenedTimestamp', Date.now().toString())
-  }
-
-  // Redirect functions (use global settings)
-  const openDirectLinkBehind = () => {
-    if (!settings.redirect.url) return
-    
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) 
-                     || (window.innerWidth <= 768 && 'ontouchstart' in window)
-    
-    if (isMobile) {
-      // Mobile: open content in new tab, redirect current to ad
-      const contentWindow = window.open(window.location.href, '_blank')
-      if (contentWindow) {
-        setTimeout(() => {
-          window.location.href = settings.redirect.url
-        }, 300)
-      } else {
-        setTimeout(() => {
-          window.location.href = settings.redirect.url
-        }, 300)
-      }
-    } else {
-      // Desktop: open ad in background
-      const newWin = window.open(settings.redirect.url, '_blank')
-      if (newWin) {
-        newWin.blur()
-        window.focus()
-      }
-    }
-  }
-
+  // Handle play click - just start the video
   const handlePlayClick = () => {
     if (!post) return
-
-    const behavior = settings.redirect.behavior
-    const directLinkOpened = !isCookieExpired()
-
-    // Handle redirect_first mode
-    if (behavior === 'redirect_first') {
-      if (!directLinkOpened && settings.redirect.enabled && settings.redirect.url) {
-        markDirectLinkOpened()
-        window.location.href = settings.redirect.url
-        return
-      }
-      // Second visit or no redirect URL: play video
-      showVideo()
-      return
-    }
-
-    // Handle behind mode
-    if (behavior === 'behind') {
-      if (!directLinkOpened && settings.redirect.enabled && settings.redirect.url) {
-        markDirectLinkOpened()
-        openDirectLinkBehind()
-      }
-      showVideo()
-      return
-    }
-
-    // Handle front mode
-    if (behavior === 'front') {
-      if (!directLinkOpened && settings.redirect.enabled && settings.redirect.url) {
-        markDirectLinkOpened()
-        sessionStorage.setItem('vt_return_play', '1')
-        window.location.href = settings.redirect.url
-        return
-      }
-      showVideo()
-      return
-    }
-
-    // Default: just play
     showVideo()
   }
 
-const showVideo = () => {
+  const showVideo = () => {
     setShowPreview(false)
     setIsPlaying(true)
 
@@ -380,38 +289,58 @@ const showVideo = () => {
     }
   }
 
-  // Redirect to another post when video ends
+  // Time-based redirect: redirect after X seconds of video playing
+  useEffect(() => {
+    if (!isPlaying || !settings.redirect.onTimeEnabled || !settings.redirect.onTimeUrl || timeRedirectDone) return
+
+    const timer = setTimeout(() => {
+      setTimeRedirectDone(true)
+      window.location.href = settings.redirect.onTimeUrl
+    }, (settings.redirect.onTimeSeconds || 5) * 1000)
+
+    return () => clearTimeout(timer)
+  }, [isPlaying, settings.redirect.onTimeEnabled, settings.redirect.onTimeUrl, settings.redirect.onTimeSeconds, timeRedirectDone])
+
+  // Redirect when video ends
   const onVideoEnded = useCallback(() => {
+    // If onEnd redirect is enabled, use that URL
+    if (settings.redirect.onEndEnabled && settings.redirect.onEndUrl) {
+      window.location.href = settings.redirect.onEndUrl
+      return
+    }
+    
+    // Otherwise, redirect to another random post
     if (otherPosts.length > 0) {
-      // Pick a random post from available posts
       const randomIndex = Math.floor(Math.random() * otherPosts.length)
       const nextPostId = otherPosts[randomIndex]
-      // Use window.location for full page reload
       window.location.href = `/?p=${nextPostId}`
     }
-  }, [otherPosts])
+  }, [otherPosts, settings.redirect.onEndEnabled, settings.redirect.onEndUrl])
 
-  // Auto-play on return from redirect (uses global settings)
+  // Auto-play on return from time-based redirect
   useEffect(() => {
     if (!post) return
     
-    const returnPlay = sessionStorage.getItem('vt_return_play')
-    if (returnPlay === '1') {
-      sessionStorage.removeItem('vt_return_play')
+    // Check if user came back from redirect
+    const returnedFromRedirect = sessionStorage.getItem('vt_time_redirect')
+    if (returnedFromRedirect === '1') {
+      sessionStorage.removeItem('vt_time_redirect')
+      setTimeRedirectDone(true) // Don't redirect again
       setTimeout(() => showVideo(), 500)
     }
+  }, [post])
 
-    // redirect_first: auto redirect or auto play
-    if (settings.redirect.behavior === 'redirect_first' && settings.redirect.enabled && settings.redirect.url) {
-      const directLinkOpened = !isCookieExpired()
-      if (!directLinkOpened) {
-        markDirectLinkOpened()
-        window.location.href = settings.redirect.url
-      } else {
-        setTimeout(() => showVideo(), 500)
-      }
+  // Mark redirect before leaving
+  useEffect(() => {
+    if (!isPlaying || !settings.redirect.onTimeEnabled) return
+
+    const markRedirect = () => {
+      sessionStorage.setItem('vt_time_redirect', '1')
     }
-  }, [post, settings])
+
+    window.addEventListener('beforeunload', markRedirect)
+    return () => window.removeEventListener('beforeunload', markRedirect)
+  }, [isPlaying, settings.redirect.onTimeEnabled])
 
   if (isLoading) {
     return (

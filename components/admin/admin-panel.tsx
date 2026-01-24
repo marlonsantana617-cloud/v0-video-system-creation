@@ -394,64 +394,77 @@ const handleCreatePost = async () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="flex items-center gap-4">
-                  <Switch
-                    checked={config.settings.redirect.enabled}
-                    onCheckedChange={(checked) => updateSettings({ 
-                      redirect: { ...config.settings.redirect, enabled: checked } 
-                    })}
-                  />
-                  <Label className="text-zinc-300">Habilitar redireccion</Label>
+                {/* Redirect on Time */}
+                <div className="space-y-4 p-4 bg-zinc-800/50 rounded-lg">
+                  <div className="flex items-center gap-4">
+                    <Switch
+                      checked={config.settings.redirect.onTimeEnabled}
+                      onCheckedChange={(checked) => updateSettings({ 
+                        redirect: { ...config.settings.redirect, onTimeEnabled: checked } 
+                      })}
+                    />
+                    <Label className="text-zinc-300">Redirigir despues de X segundos</Label>
+                  </div>
+
+                  {config.settings.redirect.onTimeEnabled && (
+                    <div className="space-y-4 ml-4">
+                      <div className="space-y-2">
+                        <Label className="text-zinc-400">Segundos antes de redirigir</Label>
+                        <Input
+                          type="number"
+                          value={config.settings.redirect.onTimeSeconds}
+                          onChange={(e) => updateSettings({ 
+                            redirect: { ...config.settings.redirect, onTimeSeconds: parseInt(e.target.value) || 5 } 
+                          })}
+                          placeholder="5"
+                          className="bg-zinc-800 border-zinc-700 text-zinc-100 w-32"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-zinc-400">URL de redireccion</Label>
+                        <Input
+                          value={config.settings.redirect.onTimeUrl}
+                          onChange={(e) => updateSettings({ 
+                            redirect: { ...config.settings.redirect, onTimeUrl: e.target.value } 
+                          })}
+                          placeholder="https://ejemplo.com"
+                          className="bg-zinc-800 border-zinc-700 text-zinc-100"
+                        />
+                      </div>
+                      <p className="text-xs text-zinc-500">El usuario sera redirigido despues de {config.settings.redirect.onTimeSeconds || 5} segundos. Si vuelve atras, puede continuar viendo el video.</p>
+                    </div>
+                  )}
                 </div>
 
-                {config.settings.redirect.enabled && (
-                  <>
-                    <div className="space-y-2">
-                      <Label className="text-zinc-300">URL de redireccion</Label>
-                      <Input
-                        value={config.settings.redirect.url}
-                        onChange={(e) => updateSettings({ 
-                          redirect: { ...config.settings.redirect, url: e.target.value } 
-                        })}
-                        placeholder="https://ejemplo.com"
-                        className="bg-zinc-800 border-zinc-700 text-zinc-100"
-                      />
-                    </div>
+                {/* Redirect on Video End */}
+                <div className="space-y-4 p-4 bg-zinc-800/50 rounded-lg">
+                  <div className="flex items-center gap-4">
+                    <Switch
+                      checked={config.settings.redirect.onEndEnabled}
+                      onCheckedChange={(checked) => updateSettings({ 
+                        redirect: { ...config.settings.redirect, onEndEnabled: checked } 
+                      })}
+                    />
+                    <Label className="text-zinc-300">Redirigir cuando el video termina</Label>
+                  </div>
 
-                    <div className="space-y-2">
-                      <Label className="text-zinc-300">Comportamiento</Label>
-                      <Select
-                        value={config.settings.redirect.behavior}
-                        onValueChange={(value: "behind" | "front" | "redirect_first") =>
-                          updateSettings({ 
-                            redirect: { ...config.settings.redirect, behavior: value } 
-                          })
-                        }
-                      >
-                        <SelectTrigger className="bg-zinc-800 border-zinc-700 text-zinc-100">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-zinc-800 border-zinc-700">
-                          <SelectItem value="behind" className="text-zinc-100">Detras (popunder)</SelectItem>
-                          <SelectItem value="front" className="text-zinc-100">Al frente (popup)</SelectItem>
-                          <SelectItem value="redirect_first" className="text-zinc-100">Redirigir primero</SelectItem>
-                        </SelectContent>
-                      </Select>
+                  {config.settings.redirect.onEndEnabled && (
+                    <div className="space-y-4 ml-4">
+                      <div className="space-y-2">
+                        <Label className="text-zinc-400">URL de redireccion al finalizar</Label>
+                        <Input
+                          value={config.settings.redirect.onEndUrl}
+                          onChange={(e) => updateSettings({ 
+                            redirect: { ...config.settings.redirect, onEndUrl: e.target.value } 
+                          })}
+                          placeholder="https://ejemplo.com"
+                          className="bg-zinc-800 border-zinc-700 text-zinc-100"
+                        />
+                      </div>
+                      <p className="text-xs text-zinc-500">El usuario sera redirigido cuando el video termine de reproducirse.</p>
                     </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-zinc-300">Duracion de cookie (segundos)</Label>
-                      <Input
-                        type="number"
-                        value={config.settings.redirect.cookieDuration}
-                        onChange={(e) => updateSettings({ 
-                          redirect: { ...config.settings.redirect, cookieDuration: parseInt(e.target.value) || 120 } 
-                        })}
-                        className="bg-zinc-800 border-zinc-700 text-zinc-100"
-                      />
-                    </div>
-                  </>
-                )}
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
