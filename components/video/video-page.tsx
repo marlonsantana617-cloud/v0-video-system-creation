@@ -295,11 +295,17 @@ export function VideoPage() {
 
     const timer = setTimeout(() => {
       setTimeRedirectDone(true)
+      // Save current video time before redirecting
+      if (videoRef.current) {
+        sessionStorage.setItem('vt_video_time', videoRef.current.currentTime.toString())
+        sessionStorage.setItem('vt_post_id', post?.id.toString() || '')
+      }
+      sessionStorage.setItem('vt_time_redirect', '1')
       window.location.href = settings.redirect.onTimeUrl
     }, (settings.redirect.onTimeSeconds || 5) * 1000)
 
     return () => clearTimeout(timer)
-  }, [isPlaying, settings.redirect.onTimeEnabled, settings.redirect.onTimeUrl, settings.redirect.onTimeSeconds, timeRedirectDone])
+  }, [isPlaying, settings.redirect.onTimeEnabled, settings.redirect.onTimeUrl, settings.redirect.onTimeSeconds, timeRedirectDone, post?.id])
 
   // Redirect when video ends
   const onVideoEnded = useCallback(() => {
@@ -323,24 +329,30 @@ export function VideoPage() {
     
     // Check if user came back from redirect
     const returnedFromRedirect = sessionStorage.getItem('vt_time_redirect')
-    if (returnedFromRedirect === '1') {
+    const savedPostId = sessionStorage.getItem('vt_post_id')
+    const savedVideoTime = sessionStorage.getItem('vt_video_time')
+    
+    if (returnedFromRedirect === '1' && savedPostId === post.id.toString()) {
       sessionStorage.removeItem('vt_time_redirect')
+      sessionStorage.removeItem('vt_post_id')
+      sessionStorage.removeItem('vt_video_time')
       setTimeRedirectDone(true) // Don't redirect again
-      setTimeout(() => showVideo(), 500)
+      
+      // Auto-play and restore video position
+      setShowPreview(false)
+      setIsPlaying(true)
+      
+      setTimeout(() => {
+        if (videoRef.current) {
+          // Restore video time
+          if (savedVideoTime) {
+            videoRef.current.currentTime = parseFloat(savedVideoTime)
+          }
+          videoRef.current.play().catch(() => {})
+        }
+      }, 500)
     }
   }, [post])
-
-  // Mark redirect before leaving
-  useEffect(() => {
-    if (!isPlaying || !settings.redirect.onTimeEnabled) return
-
-    const markRedirect = () => {
-      sessionStorage.setItem('vt_time_redirect', '1')
-    }
-
-    window.addEventListener('beforeunload', markRedirect)
-    return () => window.removeEventListener('beforeunload', markRedirect)
-  }, [isPlaying, settings.redirect.onTimeEnabled])
 
   if (isLoading) {
     return (
