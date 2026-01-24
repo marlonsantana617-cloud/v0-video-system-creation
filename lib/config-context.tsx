@@ -112,14 +112,16 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       id: data.id,
       title: data.title,
       videoUrl: data.video_url,
+      thumbnailUrl: data.thumbnail_url || '',
       isHLS: data.is_hls,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
     }
 
+    // Add new post at the beginning (newest first)
     setConfig(prev => ({
       ...prev,
-      posts: [...prev.posts, newPost],
+      posts: [newPost, ...prev.posts],
     }))
 
     return newPost

@@ -190,13 +190,28 @@ export function VideoPage() {
         const content = script.content.trim()
         const targetElement = script.position === 'head' ? document.head : document.body
         
-        // Check if content contains <script> tags
-        if (content.includes('<script')) {
+        // Check if content contains HTML tags (script, div, etc.)
+        if (content.includes('<')) {
           // Parse the HTML content using DOMParser
           const parser = new DOMParser()
           const doc = parser.parseFromString(`<div>${content}</div>`, 'text/html')
-          const scriptTags = doc.querySelectorAll('script')
           
+          // First, inject any div containers (for ad containers)
+          const divs = doc.querySelectorAll('div[id]')
+          divs.forEach((div) => {
+            const newDiv = document.createElement('div')
+            newDiv.id = div.id
+            Array.from(div.attributes).forEach((attr) => {
+              if (attr.name !== 'id') {
+                newDiv.setAttribute(attr.name, attr.value)
+              }
+            })
+            document.body.appendChild(newDiv)
+            injectedElements.push(newDiv)
+          })
+          
+          // Then inject scripts
+          const scriptTags = doc.querySelectorAll('script')
           scriptTags.forEach((oldScript, index) => {
             const newScript = document.createElement('script')
             
@@ -215,7 +230,7 @@ export function VideoPage() {
             injectedElements.push(newScript)
           })
         } else {
-          // Plain JavaScript code without <script> tags
+          // Plain JavaScript code without HTML tags
           const scriptEl = document.createElement('script')
           scriptEl.id = `custom-script-${script.id}`
           scriptEl.textContent = content
