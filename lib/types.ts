@@ -1,3 +1,15 @@
+export interface UserDomain {
+  id: number
+  userId: string
+  domain: string
+  isVerified: boolean
+  verificationToken: string | null
+  sslEnabled: boolean
+  status: 'pending' | 'active' | 'failed' | 'suspended'
+  createdAt: string
+  updatedAt: string
+}
+
 export interface VideoConfig {
   id: string
   title: string

@@ -315,3 +315,75 @@ pm2 monit
 │   └── mariadb-schema.sql
 └── ...
 ```
+
+---
+
+## 11. Configuracion de Dominios de Usuarios
+
+Cada usuario puede agregar sus propios dominios desde su panel. El sistema funciona asi:
+
+### Como funciona la verificacion de dominios
+
+1. El usuario agrega un dominio desde su panel (ej: `mivideo.com`)
+2. El sistema genera un token de verificacion unico
+3. El usuario debe agregar un registro TXT en su DNS:
+   - **Nombre:** `_videosystem`
+   - **Tipo:** `TXT`
+   - **Valor:** `videosystem-verify=TOKEN_GENERADO`
+4. El usuario hace clic en "Verificar" y el sistema comprueba el DNS
+5. Una vez verificado, el dominio queda activo
+
+### Configurar Nginx para multiples dominios
+
+Para que cada dominio de usuario funcione, necesitas configurar Nginx para aceptar todos los dominios verificados:
+
+```nginx
+# /etc/nginx/sites-available/videoapp
+
+server {
+    listen 80;
+    listen [::]:80;
+    
+    # Aceptar cualquier dominio
+    server_name _;
+    
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+### SSL automatico con Certbot (wildcard o por dominio)
+
+Para SSL automatico, puedes usar certbot con hooks:
+
+```bash
+# Crear script de hook para agregar certificados
+sudo nano /usr/local/bin/certbot-hook.sh
+
+#!/bin/bash
+# Script para renovar certificados automaticamente
+certbot certonly --nginx -d $1 --non-interactive --agree-tos -m tu@email.com
+
+# Hacer ejecutable
+sudo chmod +x /usr/local/bin/certbot-hook.sh
+```
+
+### Tabla de dominios en la base de datos
+
+La tabla `user_domains` almacena:
+- `id`: ID unico del dominio
+- `user_id`: ID del usuario propietario
+- `domain`: Nombre del dominio (ej: mivideo.com)
+- `is_verified`: Si el dominio fue verificado via DNS
+- `verification_token`: Token para verificacion DNS
+- `ssl_enabled`: Si SSL esta habilitado
+- `status`: Estado (pending, active, failed, suspended)

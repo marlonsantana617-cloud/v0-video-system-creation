@@ -72,6 +72,25 @@ CREATE TABLE IF NOT EXISTS user_settings (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
+-- User Domains Table (domains per user)
+-- ============================================
+CREATE TABLE IF NOT EXISTS user_domains (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    domain VARCHAR(255) NOT NULL,
+    is_verified BOOLEAN DEFAULT FALSE,
+    verification_token VARCHAR(64),
+    ssl_enabled BOOLEAN DEFAULT FALSE,
+    status ENUM('pending', 'active', 'failed', 'suspended') DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_domains_user_id (user_id),
+    INDEX idx_domains_domain (domain),
+    UNIQUE KEY unique_domain (domain),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================
 -- Cleanup old sessions (optional scheduled task)
 -- Run this periodically: DELETE FROM sessions WHERE expires_at < NOW();
 -- ============================================

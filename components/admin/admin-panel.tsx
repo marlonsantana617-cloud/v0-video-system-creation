@@ -18,11 +18,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { ThumbnailCapture } from "./thumbnail-capture"
 import { 
   Settings, Video, Share2, Link2, BarChart3, Code, Save, 
-  Plus, Trash2, Copy, ExternalLink, Edit2, Play, LogOut
+  Plus, Trash2, Copy, ExternalLink, Edit2, Play, LogOut, Globe
 } from "lucide-react"
 import { ChangePassword } from "./change-password"
 import { Users } from "lucide-react"
 import { UserManagement } from "./user-management"
+import { DomainManagement } from "./domain-management"
 
 export function AdminPanel() {
   const configContext = useConfig()
@@ -166,6 +167,10 @@ export function AdminPanel() {
             <TabsTrigger value="scripts" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-zinc-400 px-4 py-2">
               <Code className="w-4 h-4 mr-2" />
               Scripts
+            </TabsTrigger>
+            <TabsTrigger value="domains" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-zinc-400 px-4 py-2">
+              <Globe className="w-4 h-4 mr-2" />
+              Dominios
             </TabsTrigger>
             {isAdmin && (
               <TabsTrigger value="users" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-zinc-400 px-4 py-2">
@@ -558,6 +563,11 @@ export function AdminPanel() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Domains Tab - All users */}
+          <TabsContent value="domains" className="space-y-6">
+            <DomainManagement />
           </TabsContent>
 
           {/* Users Tab - ADMIN ONLY */}
