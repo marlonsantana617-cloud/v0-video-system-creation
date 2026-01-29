@@ -73,15 +73,14 @@ CREATE TABLE IF NOT EXISTS user_settings (
 
 -- ============================================
 -- User Domains Table (domains per user)
+-- Cada usuario puede agregar sus dominios y acceder a sus posts desde ellos
+-- Ejemplo: midominio.com/?p=123 muestra el post 123 del usuario que tiene ese dominio
 -- ============================================
 CREATE TABLE IF NOT EXISTS user_domains (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id VARCHAR(36) NOT NULL,
     domain VARCHAR(255) NOT NULL,
-    is_verified BOOLEAN DEFAULT FALSE,
-    verification_token VARCHAR(64),
-    ssl_enabled BOOLEAN DEFAULT FALSE,
-    status ENUM('pending', 'active', 'failed', 'suspended') DEFAULT 'pending',
+    status ENUM('active', 'suspended') DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_domains_user_id (user_id),

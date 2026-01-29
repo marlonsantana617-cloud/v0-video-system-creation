@@ -17,20 +17,56 @@ interface UserSettings {
   scripts: string
 }
 
+interface UserDomain {
+  id: number
+  user_id: string
+  domain: string
+  status: string
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const postId = searchParams.get('id')
+    
+    // Obtener el dominio desde el header Host
+    const host = request.headers.get('host') || ''
+    const domain = host.replace(/^www\./, '').split(':')[0] // Quitar www. y puerto
 
     if (!postId) {
       return NextResponse.json({ error: 'ID requerido' }, { status: 400 })
     }
 
-    // Get post
-    const post = await queryOne<Post>(
-      'SELECT * FROM posts WHERE id = ?',
-      [postId]
+    // Buscar el dominio en la base de datos para obtener el user_id
+    const userDomain = await queryOne<UserDomain>(
+      'SELECT * FROM user_domains WHERE domain = ? AND status = ?',
+      [domain, 'active']
     )
+
+    let userId: string | null = null
+
+    if (userDomain) {
+      // Si encontramos el dominio, usamos el user_id del dominio
+      userId = userDomain.user_id
+    }
+
+    // Get post
+    let post: Post | null = null
+
+    if (userId) {
+      // Buscar el post que pertenece al usuario del dominio
+      post = await queryOne<Post>(
+        'SELECT * FROM posts WHERE id = ? AND user_id = ?',
+        [postId, userId]
+      )
+    } else {
+      // Si no hay dominio registrado, buscar el post sin filtrar por usuario
+      // (para desarrollo local o dominio principal)
+      post = await queryOne<Post>(
+        'SELECT * FROM posts WHERE id = ?',
+        [postId]
+      )
+    }
 
     if (!post) {
       return NextResponse.json({ error: 'Post no encontrado' }, { status: 404 })
@@ -68,7 +104,8 @@ export async function GET(request: Request) {
         counter: {},
         scripts: []
       },
-      otherPosts: otherPosts.map(p => p.id)
+      otherPosts: otherPosts.map(p => p.id),
+      domain: userDomain ? userDomain.domain : null
     })
   } catch (error) {
     console.error('Get public post error:', error)

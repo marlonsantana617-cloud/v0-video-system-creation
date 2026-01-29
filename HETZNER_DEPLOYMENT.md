@@ -318,24 +318,31 @@ pm2 monit
 
 ---
 
-## 11. Configuracion de Dominios de Usuarios
+## 11. Sistema de Dominios por Usuario
 
-Cada usuario puede agregar sus propios dominios desde su panel. El sistema funciona asi:
+Cada usuario puede agregar sus propios dominios desde su panel. Los dominios se activan automaticamente.
 
-### Como funciona la verificacion de dominios
+### Como funciona
 
-1. El usuario agrega un dominio desde su panel (ej: `mivideo.com`)
-2. El sistema genera un token de verificacion unico
-3. El usuario debe agregar un registro TXT en su DNS:
-   - **Nombre:** `_videosystem`
-   - **Tipo:** `TXT`
-   - **Valor:** `videosystem-verify=TOKEN_GENERADO`
-4. El usuario hace clic en "Verificar" y el sistema comprueba el DNS
-5. Una vez verificado, el dominio queda activo
+1. El usuario agrega un dominio desde su panel (ej: `midominio.com`)
+2. El dominio se activa automaticamente
+3. El usuario configura su DNS para que apunte a la IP del servidor
+4. Los posts del usuario son accesibles desde ese dominio: `midominio.com/?p=123`
+
+### Configuracion DNS (el usuario debe hacer esto)
+
+El usuario debe configurar un registro A en su proveedor de DNS:
+
+```
+Tipo: A
+Nombre: @ (o el subdominio)
+Valor: IP_DEL_SERVIDOR
+TTL: 3600
+```
 
 ### Configurar Nginx para multiples dominios
 
-Para que cada dominio de usuario funcione, necesitas configurar Nginx para aceptar todos los dominios verificados:
+Nginx debe aceptar cualquier dominio y pasarlo a la aplicacion:
 
 ```nginx
 # /etc/nginx/sites-available/videoapp
@@ -361,29 +368,18 @@ server {
 }
 ```
 
-### SSL automatico con Certbot (wildcard o por dominio)
+### Logica de dominios
 
-Para SSL automatico, puedes usar certbot con hooks:
+- Cuando alguien accede a `midominio.com/?p=123`:
+  1. El sistema busca `midominio.com` en la tabla `user_domains`
+  2. Obtiene el `user_id` del dueno del dominio
+  3. Busca el post `123` que pertenezca a ese usuario
+  4. Si existe, muestra el video; si no, muestra error 404
 
-```bash
-# Crear script de hook para agregar certificados
-sudo nano /usr/local/bin/certbot-hook.sh
-
-#!/bin/bash
-# Script para renovar certificados automaticamente
-certbot certonly --nginx -d $1 --non-interactive --agree-tos -m tu@email.com
-
-# Hacer ejecutable
-sudo chmod +x /usr/local/bin/certbot-hook.sh
-```
-
-### Tabla de dominios en la base de datos
+### Tabla de dominios
 
 La tabla `user_domains` almacena:
 - `id`: ID unico del dominio
 - `user_id`: ID del usuario propietario
-- `domain`: Nombre del dominio (ej: mivideo.com)
-- `is_verified`: Si el dominio fue verificado via DNS
-- `verification_token`: Token para verificacion DNS
-- `ssl_enabled`: Si SSL esta habilitado
-- `status`: Estado (pending, active, failed, suspended)
+- `domain`: Nombre del dominio (ej: midominio.com)
+- `status`: Estado (active, suspended)

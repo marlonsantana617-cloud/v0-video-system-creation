@@ -88,10 +88,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Este dominio ya esta registrado" }, { status: 400 })
     }
 
-    // Insert domain (status pending - admin will approve manually)
+    // Insert domain - activo automaticamente
     await query(
       `INSERT INTO user_domains (user_id, domain, status) 
-       VALUES (?, ?, 'pending')`,
+       VALUES (?, ?, 'active')`,
       [user.id, cleanDomain]
     )
 

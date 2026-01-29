@@ -5,11 +5,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { 
-  Globe, Plus, Trash2, CheckCircle2, XCircle, Clock, 
-  RefreshCw, AlertCircle
-} from "lucide-react"
-import type { UserDomain } from "@/lib/types"
+import { Globe, Plus, Trash2, CheckCircle2, RefreshCw, ExternalLink } from "lucide-react"
+
+interface UserDomain {
+  id: number
+  domain: string
+  status: string
+  created_at: string
+}
 
 export function DomainManagement() {
   const [domains, setDomains] = useState<UserDomain[]>([])
@@ -17,6 +20,7 @@ export function DomainManagement() {
   const [isLoading, setIsLoading] = useState(true)
   const [isAdding, setIsAdding] = useState(false)
   const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
 
   useEffect(() => {
     fetchDomains()
@@ -39,14 +43,28 @@ export function DomainManagement() {
   const addDomain = async () => {
     if (!newDomain.trim()) return
 
+    // Limpiar dominio (quitar http://, https://, www., trailing slashes)
+    let cleanDomain = newDomain.trim().toLowerCase()
+    cleanDomain = cleanDomain.replace(/^https?:\/\//, '')
+    cleanDomain = cleanDomain.replace(/^www\./, '')
+    cleanDomain = cleanDomain.replace(/\/+$/, '')
+
+    // Validar formato
+    const domainRegex = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*\.[a-z]{2,}$/
+    if (!domainRegex.test(cleanDomain)) {
+      setError("Formato de dominio invalido. Ejemplo: midominio.com")
+      return
+    }
+
     setIsAdding(true)
     setError("")
+    setSuccess("")
 
     try {
       const res = await fetch("/api/domains", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ domain: newDomain })
+        body: JSON.stringify({ domain: cleanDomain })
       })
 
       const data = await res.json()
@@ -56,8 +74,10 @@ export function DomainManagement() {
         return
       }
 
+      setSuccess("Dominio agregado correctamente")
       setDomains([data.domain, ...domains])
       setNewDomain("")
+      setTimeout(() => setSuccess(""), 3000)
     } catch (err) {
       setError("Error de conexion")
     } finally {
@@ -66,60 +86,17 @@ export function DomainManagement() {
   }
 
   const deleteDomain = async (id: number) => {
-    if (!confirm("Estas seguro de eliminar este dominio?")) return
+    if (!confirm("¿Estas seguro de eliminar este dominio?")) return
 
     try {
       const res = await fetch(`/api/domains?id=${id}`, { method: "DELETE" })
       if (res.ok) {
         setDomains(domains.filter(d => d.id !== id))
+        setSuccess("Dominio eliminado")
+        setTimeout(() => setSuccess(""), 3000)
       }
     } catch (err) {
       console.error("Error deleting domain:", err)
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "active":
-        return <CheckCircle2 className="w-5 h-5 text-green-500" />
-      case "pending":
-        return <Clock className="w-5 h-5 text-yellow-500" />
-      case "failed":
-        return <XCircle className="w-5 h-5 text-red-500" />
-      case "suspended":
-        return <AlertCircle className="w-5 h-5 text-orange-500" />
-      default:
-        return <Clock className="w-5 h-5 text-zinc-500" />
-    }
-  }
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "Pendiente de aprobacion"
-      case "active":
-        return "Activo"
-      case "failed":
-        return "Rechazado"
-      case "suspended":
-        return "Suspendido"
-      default:
-        return status
-    }
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active":
-        return "bg-green-500/20 text-green-400 border-green-500/30"
-      case "pending":
-        return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30"
-      case "failed":
-        return "bg-red-500/20 text-red-400 border-red-500/30"
-      case "suspended":
-        return "bg-orange-500/20 text-orange-400 border-orange-500/30"
-      default:
-        return "bg-zinc-500/20 text-zinc-400 border-zinc-500/30"
     }
   }
 
@@ -141,7 +118,7 @@ export function DomainManagement() {
           Mis Dominios
         </CardTitle>
         <CardDescription className="text-zinc-400">
-          Agrega dominios para acceder a tus posts desde diferentes URLs
+          Agrega tus dominios para acceder a tus posts desde diferentes URLs
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -151,8 +128,11 @@ export function DomainManagement() {
           <div className="flex gap-2">
             <Input
               value={newDomain}
-              onChange={(e) => setNewDomain(e.target.value)}
-              placeholder="ejemplo.com"
+              onChange={(e) => {
+                setNewDomain(e.target.value)
+                setError("")
+              }}
+              placeholder="midominio.com"
               className="bg-zinc-800 border-zinc-700 text-zinc-100"
               onKeyDown={(e) => e.key === "Enter" && addDomain()}
             />
@@ -169,10 +149,10 @@ export function DomainManagement() {
             </Button>
           </div>
           {error && (
-            <p className="text-sm text-red-400 flex items-center gap-1">
-              <XCircle className="w-4 h-4" />
-              {error}
-            </p>
+            <p className="text-sm text-red-400">{error}</p>
+          )}
+          {success && (
+            <p className="text-sm text-green-400">{success}</p>
           )}
         </div>
 
@@ -193,29 +173,32 @@ export function DomainManagement() {
                 className="p-4 bg-zinc-800 rounded-lg flex items-center justify-between"
               >
                 <div className="flex items-center gap-3">
-                  {getStatusIcon(domain.status)}
+                  <CheckCircle2 className="w-5 h-5 text-green-500" />
                   <div>
                     <h3 className="font-medium text-zinc-100">{domain.domain}</h3>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className={`text-xs px-2 py-0.5 rounded border ${getStatusColor(domain.status)}`}>
-                        {getStatusText(domain.status)}
-                      </span>
-                      {domain.status === "active" && (
-                        <span className="text-xs text-zinc-500">
-                          Usa: {domain.domain}/?p=ID
-                        </span>
-                      )}
-                    </div>
+                    <p className="text-xs text-zinc-500 mt-1">
+                      Ejemplo: {domain.domain}/?p=123
+                    </p>
                   </div>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => deleteDomain(domain.id)}
-                  className="border-red-600 bg-transparent hover:bg-red-600/20 text-red-400"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={`https://${domain.domain}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 text-zinc-400 hover:text-white transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => deleteDomain(domain.id)}
+                    className="border-red-600 bg-transparent hover:bg-red-600/20 text-red-400"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
@@ -223,12 +206,11 @@ export function DomainManagement() {
 
         {/* Info section */}
         <div className="p-4 bg-blue-900/20 border border-blue-800/50 rounded-lg">
-          <h4 className="text-sm font-medium text-blue-400 mb-2">Como funciona</h4>
+          <h4 className="text-sm font-medium text-blue-400 mb-2">Como usar tus dominios</h4>
           <ul className="text-xs text-zinc-400 space-y-1 list-disc list-inside">
-            <li>Agrega el dominio que deseas usar</li>
-            <li>El administrador aprobara tu dominio manualmente</li>
-            <li>Una vez activo, podras acceder a tus posts desde ese dominio</li>
-            <li>Ejemplo: <code className="bg-zinc-800 px-1 rounded">tudominio.com/?p=123</code></li>
+            <li>Asegurate de que el dominio apunte a la IP del servidor</li>
+            <li>Configura el DNS tipo A apuntando a la IP del servidor</li>
+            <li>Una vez configurado, accede a tus posts: <code className="bg-zinc-800 px-1 rounded">tudominio.com/?p=ID</code></li>
           </ul>
         </div>
       </CardContent>
