@@ -1,13 +1,10 @@
 "use client"
 
 import React from "react"
-
 import { useState } from "react"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { 
   Dialog, 
   DialogContent, 
@@ -20,13 +17,11 @@ import { Key, Check, AlertCircle } from "lucide-react"
 
 export function ChangePassword() {
   const [open, setOpen] = useState(false)
-  const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
-  const supabase = createClient()
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -46,44 +41,24 @@ export function ChangePassword() {
     setLoading(true)
 
     try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user?.email) {
-        setError("No se pudo obtener el usuario actual")
-        setLoading(false)
-        return
-      }
-
-      // Verify current password by attempting to sign in
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: currentPassword,
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPassword })
       })
 
-      if (signInError) {
-        setError("La contrasena actual es incorrecta")
-        setLoading(false)
-        return
-      }
+      const data = await res.json()
 
-      // Update password
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword,
-      })
-
-      if (updateError) {
-        setError(updateError.message)
+      if (!res.ok) {
+        setError(data.error || "Error al cambiar la contrasena")
         setLoading(false)
         return
       }
 
       setSuccess(true)
-      setCurrentPassword("")
       setNewPassword("")
       setConfirmPassword("")
 
-      // Close dialog after 2 seconds
       setTimeout(() => {
         setOpen(false)
         setSuccess(false)
@@ -99,8 +74,6 @@ export function ChangePassword() {
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen)
     if (!isOpen) {
-      // Reset form on close
-      setCurrentPassword("")
       setNewPassword("")
       setConfirmPassword("")
       setError(null)
@@ -115,15 +88,15 @@ export function ChangePassword() {
           variant="outline" 
           className="border-zinc-700 bg-transparent hover:bg-zinc-800 text-zinc-300"
         >
-          <Key className="w-4 h-4 mr-2" />
-          Cambiar Clave
+          <Key className="w-4 h-4 md:mr-2" />
+          <span className="hidden md:inline">Cambiar Clave</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100">
         <DialogHeader>
           <DialogTitle>Cambiar Contrasena</DialogTitle>
           <DialogDescription className="text-zinc-400">
-            Ingresa tu contrasena actual y la nueva contrasena
+            Ingresa tu nueva contrasena
           </DialogDescription>
         </DialogHeader>
 
@@ -136,18 +109,6 @@ export function ChangePassword() {
           </div>
         ) : (
           <form onSubmit={handleChangePassword} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="currentPassword" className="text-zinc-300">Contrasena Actual</Label>
-              <Input
-                id="currentPassword"
-                type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                required
-                className="bg-zinc-800 border-zinc-700 text-zinc-100"
-              />
-            </div>
-
             <div className="space-y-2">
               <Label htmlFor="newPassword" className="text-zinc-300">Nueva Contrasena</Label>
               <Input

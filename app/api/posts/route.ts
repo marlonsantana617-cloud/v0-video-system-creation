@@ -1,30 +1,23 @@
+import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { getCurrentUser } from '@/lib/auth'
-import { query, queryOne } from '@/lib/db'
-
-interface Post {
-  id: number
-  user_id: string
-  title: string
-  video_url: string
-  thumbnail_url: string
-  is_hls: boolean
-  created_at: string
-  updated_at: string
-}
 
 // Get all posts for current user
 export async function GET() {
   try {
-    const user = await getCurrentUser()
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
     if (!user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const posts = await query<Post>(
-      'SELECT * FROM posts WHERE user_id = $1 ORDER BY id DESC',
-      [user.id]
-    )
+    const { data: posts, error } = await supabase
+      .from('posts')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('id', { ascending: false })
+
+    if (error) throw error
 
     return NextResponse.json({ posts })
   } catch (error) {
@@ -36,18 +29,28 @@ export async function GET() {
 // Create new post
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser()
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
     if (!user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
     const { title, videoUrl, thumbnailUrl, isHLS } = await request.json()
 
-    const post = await queryOne<Post>(
-      `INSERT INTO posts (user_id, title, video_url, thumbnail_url, is_hls) 
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [user.id, title || '', videoUrl || '', thumbnailUrl || '', isHLS || false]
-    )
+    const { data: post, error } = await supabase
+      .from('posts')
+      .insert({
+        user_id: user.id,
+        title: title || '',
+        video_url: videoUrl || '',
+        thumbnail_url: thumbnailUrl || '',
+        is_hls: isHLS || false
+      })
+      .select()
+      .single()
+
+    if (error) throw error
 
     return NextResponse.json({ post })
   } catch (error) {
@@ -59,7 +62,9 @@ export async function POST(request: Request) {
 // Update posts
 export async function PUT(request: Request) {
   try {
-    const user = await getCurrentUser()
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
     if (!user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
@@ -67,11 +72,19 @@ export async function PUT(request: Request) {
     const { posts } = await request.json()
 
     for (const post of posts) {
-      await query(
-        `UPDATE posts SET title = $1, video_url = $2, thumbnail_url = $3, is_hls = $4, updated_at = NOW()
-         WHERE id = $5 AND user_id = $6`,
-        [post.title, post.videoUrl, post.thumbnailUrl || '', post.isHLS, post.id, user.id]
-      )
+      const { error } = await supabase
+        .from('posts')
+        .update({
+          title: post.title,
+          video_url: post.videoUrl,
+          thumbnail_url: post.thumbnailUrl || '',
+          is_hls: post.isHLS || false,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', post.id)
+        .eq('user_id', user.id)
+
+      if (error) throw error
     }
 
     return NextResponse.json({ success: true })
@@ -84,7 +97,9 @@ export async function PUT(request: Request) {
 // Delete post
 export async function DELETE(request: Request) {
   try {
-    const user = await getCurrentUser()
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
     if (!user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
@@ -96,10 +111,13 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'ID requerido' }, { status: 400 })
     }
 
-    await query(
-      'DELETE FROM posts WHERE id = $1 AND user_id = $2',
-      [postId, user.id]
-    )
+    const { error } = await supabase
+      .from('posts')
+      .delete()
+      .eq('id', postId)
+      .eq('user_id', user.id)
+
+    if (error) throw error
 
     return NextResponse.json({ success: true })
   } catch (error) {

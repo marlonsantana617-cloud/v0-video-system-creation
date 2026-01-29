@@ -1,6 +1,5 @@
+import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { login } from '@/lib/auth'
-import { cookies } from 'next/headers'
 
 export async function POST(request: Request) {
   try {
@@ -10,25 +9,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Email y password requeridos' }, { status: 400 })
     }
 
-    const result = await login(email, password)
+    const supabase = await createClient()
     
-    if (!result) {
-      return NextResponse.json({ error: 'Credenciales invalidas' }, { status: 401 })
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 401 })
     }
 
-    const cookieStore = await cookies()
-    cookieStore.set('auth_token', result.token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60, // 30 days
-      path: '/',
-    })
+    // Get user profile to check role
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', data.user.id)
+      .single()
 
     return NextResponse.json({ 
       user: { 
-        id: result.user.id, 
-        email: result.user.email 
+        id: data.user.id, 
+        email: data.user.email,
+        role: profile?.role || 'user'
       } 
     })
   } catch (error) {

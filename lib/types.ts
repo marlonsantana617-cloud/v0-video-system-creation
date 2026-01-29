@@ -1,3 +1,12 @@
+export interface UserDomain {
+  id: number
+  userId: string
+  domain: string
+  status: 'active' | 'suspended'
+  createdAt: string
+  updatedAt: string
+}
+
 export interface VideoConfig {
   id: string
   title: string

@@ -18,11 +18,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { ThumbnailCapture } from "./thumbnail-capture"
 import { 
   Settings, Video, Share2, Link2, BarChart3, Code, Save, 
-  Plus, Trash2, Copy, ExternalLink, Edit2, Play, LogOut
+  Plus, Trash2, Copy, ExternalLink, Edit2, Play, LogOut, Globe
 } from "lucide-react"
 import { ChangePassword } from "./change-password"
 import { Users } from "lucide-react"
 import { UserManagement } from "./user-management"
+import { DomainManagement } from "./domain-management"
 
 export function AdminPanel() {
   const configContext = useConfig()
@@ -113,62 +114,68 @@ export function AdminPanel() {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-600 rounded-lg">
-              <Settings className="w-5 h-5" />
+        <div className="max-w-6xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-600 rounded-lg">
+                <Settings className="w-5 h-5" />
+              </div>
+              <div>
+                <h1 className="text-lg font-semibold">Panel de Administracion</h1>
+                <p className="text-sm text-zinc-400">
+                  {userEmail && <span className="text-zinc-500">{userEmail}</span>}
+                  {isAdmin && <span className="ml-2 text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded">Admin</span>}
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-lg font-semibold">Panel de Administracion</h1>
-              <p className="text-sm text-zinc-400">
-                {userEmail && <span className="text-zinc-500">{userEmail}</span>}
-                {isAdmin && <span className="ml-2 text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded">Admin</span>}
-              </p>
+            <div className="flex items-center gap-2">
+              <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white">
+                <Save className="w-4 h-4 md:mr-2" />
+                <span className="hidden md:inline">{saved ? "Guardado!" : "Guardar"}</span>
+              </Button>
+              <ChangePassword />
+              <Button 
+                onClick={handleLogout} 
+                variant="outline" 
+                className="border-zinc-700 bg-transparent hover:bg-zinc-800 text-zinc-300"
+              >
+                <LogOut className="w-4 h-4 md:mr-2" />
+                <span className="hidden md:inline">Salir</span>
+              </Button>
             </div>
-          </div>
-          <div className="flex items-center gap-2 md:gap-3">
-            <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white">
-              <Save className="w-4 h-4 md:mr-2" />
-              <span className="hidden md:inline">{saved ? "Guardado!" : "Guardar"}</span>
-            </Button>
-            <ChangePassword />
-            <Button 
-              onClick={handleLogout} 
-              variant="outline" 
-              className="border-zinc-700 bg-transparent hover:bg-zinc-800 text-zinc-300"
-            >
-              <LogOut className="w-4 h-4 md:mr-2" />
-              <span className="hidden md:inline">Salir</span>
-            </Button>
           </div>
         </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8">
         <Tabs defaultValue="posts" className="space-y-6">
-          <TabsList className="bg-zinc-900 border border-zinc-800 p-1 h-auto flex-wrap">
-            <TabsTrigger value="posts" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-zinc-400 px-4 py-2">
+          <TabsList className="bg-zinc-900 border border-zinc-800 p-1.5 h-auto flex flex-wrap gap-1 w-full justify-start">
+            <TabsTrigger value="posts" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-zinc-400 px-3 py-2 rounded-md transition-colors">
               <Video className="w-4 h-4 mr-2" />
               Publicaciones
             </TabsTrigger>
-            <TabsTrigger value="buttons" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-zinc-400 px-4 py-2">
+            <TabsTrigger value="buttons" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-zinc-400 px-3 py-2 rounded-md transition-colors">
               <Share2 className="w-4 h-4 mr-2" />
               Botones Flotantes
             </TabsTrigger>
-            <TabsTrigger value="redirect" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-zinc-400 px-4 py-2">
+            <TabsTrigger value="redirect" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-zinc-400 px-3 py-2 rounded-md transition-colors">
               <Link2 className="w-4 h-4 mr-2" />
               Redirecciones
             </TabsTrigger>
-            <TabsTrigger value="counter" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-zinc-400 px-4 py-2">
+            <TabsTrigger value="counter" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-zinc-400 px-3 py-2 rounded-md transition-colors">
               <BarChart3 className="w-4 h-4 mr-2" />
               Contador
             </TabsTrigger>
-            <TabsTrigger value="scripts" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-zinc-400 px-4 py-2">
+            <TabsTrigger value="scripts" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-zinc-400 px-3 py-2 rounded-md transition-colors">
               <Code className="w-4 h-4 mr-2" />
               Scripts
             </TabsTrigger>
+            <TabsTrigger value="domains" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-zinc-400 px-3 py-2 rounded-md transition-colors">
+              <Globe className="w-4 h-4 mr-2" />
+              Dominios
+            </TabsTrigger>
             {isAdmin && (
-              <TabsTrigger value="users" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-zinc-400 px-4 py-2">
+              <TabsTrigger value="users" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-zinc-400 px-3 py-2 rounded-md transition-colors">
                 <Users className="w-4 h-4 mr-2" />
                 Usuarios
               </TabsTrigger>
@@ -558,6 +565,11 @@ export function AdminPanel() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Domains Tab - All users */}
+          <TabsContent value="domains" className="space-y-6">
+            <DomainManagement />
           </TabsContent>
 
           {/* Users Tab - ADMIN ONLY */}
