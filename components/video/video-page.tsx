@@ -1,10 +1,7 @@
 "use client"
 
-import { useRouter } from "next/navigation"
-
 import { useEffect, useState, useRef, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import type { Post, GlobalSettings } from "@/lib/types"
 import { defaultSystemConfig, defaultFloatingButtons, defaultRedirect, defaultCounter } from "@/lib/types"
 
@@ -21,9 +18,8 @@ export function VideoPage() {
   const [showPreview, setShowPreview] = useState(true)
   const videoRef = useRef<HTMLVideoElement>(null)
   const previewVideoRef = useRef<HTMLVideoElement>(null)
-  const supabase = createClient()
 
-  // Load post and settings from Supabase
+  // Load post and settings from API
   useEffect(() => {
     const loadData = async () => {
       if (!postId) {
@@ -31,57 +27,53 @@ export function VideoPage() {
         return
       }
 
-      // Load post from database
-      const { data: postData, error: postError } = await supabase
-        .from('posts')
-        .select('*')
-        .eq('id', parseInt(postId))
-        .single()
+      try {
+        const res = await fetch(`/api/public/post?id=${postId}`)
+        
+        if (!res.ok) {
+          setNotFound(true)
+          setIsLoading(false)
+          return
+        }
 
-      if (postError || !postData) {
-        setNotFound(true)
-        setIsLoading(false)
-        return
-      }
+        const data = await res.json()
 
-      // Set post data
-      setPost({
-        id: postData.id,
-        title: postData.title,
-        videoUrl: postData.video_url,
-        isHLS: postData.is_hls,
-        createdAt: postData.created_at,
-        updatedAt: postData.updated_at,
-      })
+        if (!data.post) {
+          setNotFound(true)
+          setIsLoading(false)
+          return
+        }
 
-      // Load user settings for this post's owner
-      const { data: settingsData } = await supabase
-        .from('user_settings')
-        .select('*')
-        .eq('id', postData.user_id)
-        .single()
-
-      if (settingsData) {
-        setSettings({
-          siteTitle: 'Video Player',
-          siteDescription: 'Watch videos online',
-          floatingButtons: settingsData.floating_buttons || defaultFloatingButtons,
-          redirect: { ...defaultRedirect, ...(settingsData.redirect || {}) },
-          counter: { ...defaultCounter, ...(settingsData.counter || {}) },
-          scripts: settingsData.scripts || [],
+        // Set post data
+        setPost({
+          id: data.post.id,
+          title: data.post.title,
+          videoUrl: data.post.videoUrl,
+          thumbnailUrl: data.post.thumbnailUrl || '',
+          isHLS: data.post.isHLS,
+          createdAt: data.post.createdAt,
+          updatedAt: data.post.updatedAt,
         })
-      }
 
-      // Load other posts from same user for redirect on video end
-      const { data: otherPostsData } = await supabase
-        .from('posts')
-        .select('id')
-        .eq('user_id', postData.user_id)
-        .neq('id', postData.id)
-        .order('id', { ascending: false })
+        // Set settings
+        if (data.settings) {
+          setSettings({
+            siteTitle: 'Video Player',
+            siteDescription: 'Watch videos online',
+            floatingButtons: data.settings.floatingButtons || defaultFloatingButtons,
+            redirect: { ...defaultRedirect, ...(data.settings.redirect || {}) },
+            counter: { ...defaultCounter, ...(data.settings.counter || {}) },
+            scripts: data.settings.scripts || [],
+          })
+        }
 
-      if (otherPostsData && otherPostsData.length > 0) {
-        setOtherPosts(otherPostsData.map(p => p.id))
+        // Set other posts
+        if (data.otherPosts && data.otherPosts.length > 0) {
+          setOtherPosts(data.otherPosts)
+        }
+      } catch (error) {
+        console.error('Error loading data:', error)
+        setNotFound(true)
       }
 
       setIsLoading(false)

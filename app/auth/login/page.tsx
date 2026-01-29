@@ -1,10 +1,8 @@
 "use client"
 
 import React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -16,40 +14,54 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [isRegister, setIsRegister] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    try {
+      const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login'
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
 
-    if (error) {
-      setError(error.message)
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Error al procesar la solicitud')
+        setLoading(false)
+        return
+      }
+
+      router.push("/admin")
+      router.refresh()
+    } catch {
+      setError('Error de conexion')
       setLoading(false)
-      return
     }
-
-    router.push("/admin")
-    router.refresh()
   }
 
   return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
       <Card className="w-full max-w-md bg-zinc-900 border-zinc-800">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl text-zinc-100">Iniciar Sesion</CardTitle>
+          <CardTitle className="text-2xl text-zinc-100">
+            {isRegister ? 'Crear Cuenta' : 'Iniciar Sesion'}
+          </CardTitle>
           <CardDescription className="text-zinc-400">
-            Ingresa tus credenciales para acceder al panel
+            {isRegister 
+              ? 'Crea una cuenta para acceder al panel'
+              : 'Ingresa tus credenciales para acceder al panel'
+            }
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <div className="p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm">
                 {error}
@@ -78,6 +90,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="********"
                 className="bg-zinc-800 border-zinc-700 text-zinc-100"
+                minLength={6}
                 required
               />
             </div>
@@ -90,12 +103,25 @@ export default function LoginPage() {
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Ingresando...
+                  {isRegister ? 'Creando cuenta...' : 'Ingresando...'}
                 </>
               ) : (
-                "Ingresar"
+                isRegister ? 'Crear Cuenta' : 'Ingresar'
               )}
             </Button>
+
+            <div className="text-center mt-4">
+              <button
+                type="button"
+                onClick={() => setIsRegister(!isRegister)}
+                className="text-blue-400 hover:text-blue-300 text-sm"
+              >
+                {isRegister 
+                  ? 'Ya tienes cuenta? Inicia sesion'
+                  : 'No tienes cuenta? Registrate'
+                }
+              </button>
+            </div>
           </form>
         </CardContent>
       </Card>
