@@ -16,7 +16,7 @@ const pool = mysql.createPool({
 export default pool
 
 export async function query<T>(text: string, params?: unknown[]): Promise<T[]> {
-  // Convert PostgreSQL $1, $2 placeholders to MySQL ? placeholders
+  // Support both $1, $2 style and ? style placeholders for compatibility
   const mysqlQuery = text.replace(/\$(\d+)/g, '?')
   
   const [rows] = await pool.execute(mysqlQuery, params)
