@@ -19,7 +19,7 @@ export async function GET() {
     }
 
     const settings = await queryOne<UserSettings>(
-      'SELECT * FROM user_settings WHERE id = $1',
+      'SELECT * FROM user_settings WHERE id = ?',
       [user.id]
     )
 
@@ -27,7 +27,7 @@ export async function GET() {
       // Create default settings
       await query(
         `INSERT INTO user_settings (id, floating_buttons, redirect, counter, scripts) 
-         VALUES ($1, '[]', '{}', '{}', '[]')`,
+         VALUES (?, '[]', '{}', '{}', '[]')`,
         [user.id]
       )
       return NextResponse.json({ 
@@ -66,8 +66,8 @@ export async function PUT(request: Request) {
 
     await query(
       `UPDATE user_settings 
-       SET floating_buttons = $1, redirect = $2, counter = $3, scripts = $4, updated_at = NOW()
-       WHERE id = $5`,
+       SET floating_buttons = ?, redirect = ?, counter = ?, scripts = ?, updated_at = NOW()
+       WHERE id = ?`,
       [
         JSON.stringify(floatingButtons || []),
         JSON.stringify(redirect || {}),

@@ -1,26 +1,26 @@
-import { Pool } from 'pg'
+import mysql from 'mysql2/promise'
 
-const pool = new Pool({
+const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
+  port: parseInt(process.env.DB_PORT || '3306'),
   database: process.env.DB_NAME || 'videodb',
   user: process.env.DB_USER || 'videoapp',
-  password: process.env.DB_PASSWORD || 'VideoApp2026Secure',
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  password: process.env.DB_PASSWORD || '',
+  waitForConnections: true,
+  connectionLimit: 20,
+  queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 0,
 })
 
 export default pool
 
 export async function query<T>(text: string, params?: unknown[]): Promise<T[]> {
-  const client = await pool.connect()
-  try {
-    const result = await client.query(text, params)
-    return result.rows as T[]
-  } finally {
-    client.release()
-  }
+  // Convert PostgreSQL $1, $2 placeholders to MySQL ? placeholders
+  const mysqlQuery = text.replace(/\$(\d+)/g, '?')
+  
+  const [rows] = await pool.execute(mysqlQuery, params)
+  return rows as T[]
 }
 
 export async function queryOne<T>(text: string, params?: unknown[]): Promise<T | null> {

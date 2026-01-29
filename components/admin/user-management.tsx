@@ -1,9 +1,7 @@
 "use client"
 
 import React from "react"
-
 import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -13,7 +11,6 @@ import { Plus, Trash2, Loader2, UserPlus, Users } from "lucide-react"
 interface User {
   id: string
   email: string
-  role: string
   created_at: string
 }
 
@@ -26,8 +23,6 @@ export function UserManagement() {
   const [newPassword, setNewPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  
-  const supabase = createClient()
 
   useEffect(() => {
     fetchUsers()
@@ -35,15 +30,14 @@ export function UserManagement() {
 
   const fetchUsers = async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from("users")
-      .select("*")
-      .order("created_at", { ascending: false })
-
-    if (error) {
-      console.error("Error fetching users:", error)
-    } else {
-      setUsers(data || [])
+    try {
+      const res = await fetch('/api/auth/users')
+      if (res.ok) {
+        const data = await res.json()
+        setUsers(data.users || [])
+      }
+    } catch (err) {
+      console.error("Error fetching users:", err)
     }
     setLoading(false)
   }
@@ -54,35 +48,32 @@ export function UserManagement() {
     setError(null)
     setSuccess(null)
 
-    // Create user via Supabase Auth
-    const { data, error } = await supabase.auth.signUp({
-      email: newEmail,
-      password: newPassword,
-      options: {
-        data: {
-          role: "user", // New users are always "user" role
-        },
-        emailRedirectTo: `${window.location.origin}/auth/login`,
-      },
-    })
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: newEmail, password: newPassword })
+      })
 
-    if (error) {
-      setError(error.message)
-      setCreating(false)
-      return
-    }
+      const data = await res.json()
 
-    if (data.user) {
+      if (!res.ok) {
+        setError(data.error || 'Error al crear usuario')
+        setCreating(false)
+        return
+      }
+
       setSuccess(`Usuario ${newEmail} creado exitosamente`)
       setNewEmail("")
       setNewPassword("")
       setShowForm(false)
       
-      // Refresh user list
       setTimeout(() => {
         fetchUsers()
         setSuccess(null)
       }, 2000)
+    } catch {
+      setError('Error al crear usuario')
     }
 
     setCreating(false)
@@ -91,19 +82,21 @@ export function UserManagement() {
   const handleDeleteUser = async (userId: string, userEmail: string) => {
     if (!confirm(`¿Estas seguro de eliminar al usuario ${userEmail}?`)) return
 
-    // Note: Deleting users from auth requires admin privileges
-    // We'll delete from the users table which will cascade
-    const { error } = await supabase
-      .from("users")
-      .delete()
-      .eq("id", userId)
+    try {
+      const res = await fetch(`/api/auth/users?id=${userId}`, {
+        method: 'DELETE'
+      })
 
-    if (error) {
-      setError("Error al eliminar usuario: " + error.message)
-    } else {
-      setSuccess(`Usuario ${userEmail} eliminado`)
-      fetchUsers()
-      setTimeout(() => setSuccess(null), 2000)
+      if (!res.ok) {
+        const data = await res.json()
+        setError("Error al eliminar usuario: " + data.error)
+      } else {
+        setSuccess(`Usuario ${userEmail} eliminado`)
+        fetchUsers()
+        setTimeout(() => setSuccess(null), 2000)
+      }
+    } catch {
+      setError("Error al eliminar usuario")
     }
   }
 
@@ -150,7 +143,6 @@ export function UserManagement() {
           </div>
         )}
 
-        {/* Create User Form */}
         {showForm && (
           <form onSubmit={handleCreateUser} className="p-4 bg-zinc-800 rounded-lg space-y-4">
             <div className="space-y-2">
@@ -206,7 +198,6 @@ export function UserManagement() {
           </form>
         )}
 
-        {/* Users List */}
         {users.length === 0 ? (
           <div className="text-center py-8">
             <Users className="w-12 h-12 mx-auto mb-3 text-zinc-600" />
@@ -222,29 +213,18 @@ export function UserManagement() {
               >
                 <div>
                   <p className="text-zinc-100 font-medium">{user.email}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className={`text-xs px-2 py-0.5 rounded ${
-                      user.role === 'admin' 
-                        ? 'bg-blue-500/20 text-blue-400' 
-                        : 'bg-zinc-600/50 text-zinc-400'
-                    }`}>
-                      {user.role === 'admin' ? 'Administrador' : 'Usuario'}
-                    </span>
-                    <span className="text-xs text-zinc-500">
-                      {new Date(user.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
+                  <span className="text-xs text-zinc-500">
+                    {new Date(user.created_at).toLocaleDateString()}
+                  </span>
                 </div>
-                {user.role !== 'admin' && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDeleteUser(user.id, user.email)}
-                    className="border-red-600 bg-transparent hover:bg-red-600/20 text-red-400"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDeleteUser(user.id, user.email)}
+                  className="border-red-600 bg-transparent hover:bg-red-600/20 text-red-400"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
               </div>
             ))}
           </div>

@@ -1,13 +1,14 @@
 import { Suspense } from "react"
 import { Metadata } from "next"
-import { createClient } from "@supabase/supabase-js"
 import { VideoPage } from "@/components/video/video-page"
+import { queryOne } from "@/lib/db"
 
-// Create a Supabase client for server-side
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+interface Post {
+  id: number
+  title: string
+  video_url: string
+  thumbnail_url: string
+}
 
 type Props = {
   searchParams: Promise<{ p?: string }>
@@ -25,11 +26,10 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
   }
 
   // Fetch post data
-  const { data: post } = await supabase
-    .from("posts")
-    .select("*")
-    .eq("id", parseInt(postId))
-    .single()
+  const post = await queryOne<Post>(
+    "SELECT * FROM posts WHERE id = ?",
+    [parseInt(postId)]
+  )
 
   if (!post) {
     return {
@@ -40,7 +40,7 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
 
   const title = post.title || "Video"
   const videoUrl = post.video_url
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://v0-video-system-creation.vercel.app"
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://tudominio.com"
   const pageUrl = `${siteUrl}/?p=${postId}`
   
   // Use custom thumbnail or auto-generated thumbnail API

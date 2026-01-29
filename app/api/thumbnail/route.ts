@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { queryOne } from "@/lib/db"
+
+interface Post {
+  title: string
+  video_url: string
+  thumbnail_url: string
+}
 
 // Generate a thumbnail placeholder image with video title
 // This creates an Open Graph compatible image
@@ -11,13 +17,10 @@ export async function GET(request: NextRequest) {
     return new NextResponse("Missing post ID", { status: 400 })
   }
 
-  const supabase = await createClient()
-
-  const { data: post } = await supabase
-    .from("posts")
-    .select("title, video_url, thumbnail_url")
-    .eq("id", parseInt(postId))
-    .single()
+  const post = await queryOne<Post>(
+    "SELECT title, video_url, thumbnail_url FROM posts WHERE id = ?",
+    [parseInt(postId)]
+  )
 
   if (!post) {
     return new NextResponse("Post not found", { status: 404 })

@@ -28,7 +28,7 @@ export async function GET(request: Request) {
 
     // Get post
     const post = await queryOne<Post>(
-      'SELECT * FROM posts WHERE id = $1',
+      'SELECT * FROM posts WHERE id = ?',
       [postId]
     )
 
@@ -38,13 +38,13 @@ export async function GET(request: Request) {
 
     // Get user settings
     const settings = await queryOne<UserSettings>(
-      'SELECT * FROM user_settings WHERE id = $1',
+      'SELECT * FROM user_settings WHERE id = ?',
       [post.user_id]
     )
 
     // Get other posts from same user (for random redirect at end)
     const otherPosts = await query<{ id: number }>(
-      'SELECT id FROM posts WHERE user_id = $1 AND id != $2',
+      'SELECT id FROM posts WHERE user_id = ? AND id != ?',
       [post.user_id, postId]
     )
 

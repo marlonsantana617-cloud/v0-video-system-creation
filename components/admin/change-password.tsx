@@ -1,13 +1,10 @@
 "use client"
 
 import React from "react"
-
 import { useState } from "react"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { 
   Dialog, 
   DialogContent, 
@@ -26,7 +23,6 @@ export function ChangePassword() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
-  const supabase = createClient()
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -46,34 +42,19 @@ export function ChangePassword() {
     setLoading(true)
 
     try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user?.email) {
-        setError("No se pudo obtener el usuario actual")
-        setLoading(false)
-        return
-      }
-
-      // Verify current password by attempting to sign in
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: currentPassword,
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentPassword,
+          newPassword
+        })
       })
 
-      if (signInError) {
-        setError("La contrasena actual es incorrecta")
-        setLoading(false)
-        return
-      }
+      const data = await res.json()
 
-      // Update password
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword,
-      })
-
-      if (updateError) {
-        setError(updateError.message)
+      if (!res.ok) {
+        setError(data.error || "Error al cambiar la contrasena")
         setLoading(false)
         return
       }
@@ -83,7 +64,6 @@ export function ChangePassword() {
       setNewPassword("")
       setConfirmPassword("")
 
-      // Close dialog after 2 seconds
       setTimeout(() => {
         setOpen(false)
         setSuccess(false)
@@ -99,7 +79,6 @@ export function ChangePassword() {
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen)
     if (!isOpen) {
-      // Reset form on close
       setCurrentPassword("")
       setNewPassword("")
       setConfirmPassword("")

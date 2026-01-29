@@ -1,10 +1,8 @@
 "use client"
 
 import React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -21,24 +19,13 @@ export default function SetupPage() {
   const [success, setSuccess] = useState(false)
   const [hasAdmin, setHasAdmin] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
 
   useEffect(() => {
     const checkExistingAdmin = async () => {
       try {
-        // Check if any admin user exists
-        const { data, error } = await supabase
-          .from("users")
-          .select("id")
-          .eq("role", "admin")
-          .limit(1)
-
-        if (error) {
-          // Table might not exist or RLS blocking - allow setup
-          setHasAdmin(false)
-        } else {
-          setHasAdmin(data && data.length > 0)
-        }
+        const res = await fetch('/api/auth/check-setup')
+        const data = await res.json()
+        setHasAdmin(data.hasUsers || false)
       } catch {
         setHasAdmin(false)
       }
@@ -65,55 +52,27 @@ export default function SetupPage() {
     setLoading(true)
 
     try {
-      // Create admin user with Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            role: "admin",
-          },
-        },
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
       })
 
-      if (authError) {
-        setError(authError.message)
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Error al crear usuario')
         setLoading(false)
         return
       }
 
-      if (authData.user) {
-        // Update the user role to admin in the users table
-        const { error: updateError } = await supabase
-          .from("users")
-          .update({ role: "admin" })
-          .eq("id", authData.user.id)
-
-        if (updateError) {
-          // If update fails, try insert
-          await supabase.from("users").upsert({
-            id: authData.user.id,
-            email: authData.user.email,
-            role: "admin",
-          })
-        }
-
-        setSuccess(true)
-        
-        // Auto sign in and redirect
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        })
-
-        if (!signInError) {
-          setTimeout(() => {
-            router.push("/admin")
-            router.refresh()
-          }, 2000)
-        }
-      }
-    } catch (err) {
+      setSuccess(true)
+      
+      setTimeout(() => {
+        router.push("/admin")
+        router.refresh()
+      }, 2000)
+    } catch {
       setError("Error al crear el usuario administrador")
     }
 
@@ -138,7 +97,7 @@ export default function SetupPage() {
             </div>
             <CardTitle className="text-zinc-100">Setup Completado</CardTitle>
             <CardDescription className="text-zinc-400">
-              Ya existe un usuario administrador. Si necesitas acceder, usa la pagina de login.
+              Ya existe un usuario. Si necesitas acceder, usa la pagina de login.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -162,9 +121,9 @@ export default function SetupPage() {
             <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <Check className="w-6 h-6 text-green-500" />
             </div>
-            <CardTitle className="text-zinc-100">Admin Creado</CardTitle>
+            <CardTitle className="text-zinc-100">Usuario Creado</CardTitle>
             <CardDescription className="text-zinc-400">
-              El usuario administrador ha sido creado exitosamente. Redirigiendo al panel...
+              El usuario ha sido creado exitosamente. Redirigiendo al panel...
             </CardDescription>
           </CardHeader>
         </Card>
@@ -181,7 +140,7 @@ export default function SetupPage() {
           </div>
           <CardTitle className="text-zinc-100">Configuracion Inicial</CardTitle>
           <CardDescription className="text-zinc-400">
-            Crea el primer usuario administrador para acceder al panel
+            Crea el primer usuario para acceder al panel
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -236,7 +195,7 @@ export default function SetupPage() {
               disabled={loading}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white"
             >
-              {loading ? "Creando..." : "Crear Administrador"}
+              {loading ? "Creando..." : "Crear Usuario"}
             </Button>
           </form>
         </CardContent>

@@ -22,7 +22,7 @@ export async function GET() {
     }
 
     const posts = await query<Post>(
-      'SELECT * FROM posts WHERE user_id = $1 ORDER BY id DESC',
+      'SELECT * FROM posts WHERE user_id = ? ORDER BY id DESC',
       [user.id]
     )
 
@@ -43,10 +43,16 @@ export async function POST(request: Request) {
 
     const { title, videoUrl, thumbnailUrl, isHLS } = await request.json()
 
-    const post = await queryOne<Post>(
+    await query(
       `INSERT INTO posts (user_id, title, video_url, thumbnail_url, is_hls) 
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [user.id, title || '', videoUrl || '', thumbnailUrl || '', isHLS || false]
+       VALUES (?, ?, ?, ?, ?)`,
+      [user.id, title || '', videoUrl || '', thumbnailUrl || '', isHLS ? 1 : 0]
+    )
+
+    // Get the last inserted post
+    const post = await queryOne<Post>(
+      'SELECT * FROM posts WHERE user_id = ? ORDER BY id DESC LIMIT 1',
+      [user.id]
     )
 
     return NextResponse.json({ post })
@@ -68,9 +74,9 @@ export async function PUT(request: Request) {
 
     for (const post of posts) {
       await query(
-        `UPDATE posts SET title = $1, video_url = $2, thumbnail_url = $3, is_hls = $4, updated_at = NOW()
-         WHERE id = $5 AND user_id = $6`,
-        [post.title, post.videoUrl, post.thumbnailUrl || '', post.isHLS, post.id, user.id]
+        `UPDATE posts SET title = ?, video_url = ?, thumbnail_url = ?, is_hls = ?, updated_at = NOW()
+         WHERE id = ? AND user_id = ?`,
+        [post.title, post.videoUrl, post.thumbnailUrl || '', post.isHLS ? 1 : 0, post.id, user.id]
       )
     }
 
@@ -97,7 +103,7 @@ export async function DELETE(request: Request) {
     }
 
     await query(
-      'DELETE FROM posts WHERE id = $1 AND user_id = $2',
+      'DELETE FROM posts WHERE id = ? AND user_id = ?',
       [postId, user.id]
     )
 
