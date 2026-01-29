@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 import { verifySession } from "@/lib/auth"
-import { randomBytes } from "crypto"
 
 interface DomainRow {
   id: number
@@ -89,14 +88,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Este dominio ya esta registrado" }, { status: 400 })
     }
 
-    // Generate verification token
-    const verificationToken = randomBytes(32).toString("hex")
-
-    // Insert domain
+    // Insert domain (status pending - admin will approve manually)
     await query(
-      `INSERT INTO user_domains (user_id, domain, verification_token, status) 
-       VALUES (?, ?, ?, 'pending')`,
-      [user.id, cleanDomain, verificationToken]
+      `INSERT INTO user_domains (user_id, domain, status) 
+       VALUES (?, ?, 'pending')`,
+      [user.id, cleanDomain]
     )
 
     // Get the inserted domain

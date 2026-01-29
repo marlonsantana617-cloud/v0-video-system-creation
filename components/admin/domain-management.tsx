@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { 
   Globe, Plus, Trash2, CheckCircle2, XCircle, Clock, 
-  Copy, RefreshCw, AlertCircle, Shield
+  RefreshCw, AlertCircle
 } from "lucide-react"
 import type { UserDomain } from "@/lib/types"
 
@@ -16,9 +16,7 @@ export function DomainManagement() {
   const [newDomain, setNewDomain] = useState("")
   const [isLoading, setIsLoading] = useState(true)
   const [isAdding, setIsAdding] = useState(false)
-  const [verifyingId, setVerifyingId] = useState<number | null>(null)
   const [error, setError] = useState("")
-  const [copiedToken, setCopiedToken] = useState<number | null>(null)
 
   useEffect(() => {
     fetchDomains()
@@ -80,42 +78,7 @@ export function DomainManagement() {
     }
   }
 
-  const verifyDomain = async (domainId: number) => {
-    setVerifyingId(domainId)
-
-    try {
-      const res = await fetch("/api/domains/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ domainId })
-      })
-
-      const data = await res.json()
-
-      if (data.verified) {
-        // Refresh domains list
-        fetchDomains()
-      } else {
-        alert(data.message || "Verificacion fallida")
-      }
-    } catch (err) {
-      console.error("Error verifying domain:", err)
-    } finally {
-      setVerifyingId(null)
-    }
-  }
-
-  const copyVerificationToken = (domain: UserDomain) => {
-    const token = `videosystem-verify=${domain.verificationToken}`
-    navigator.clipboard.writeText(token)
-    setCopiedToken(domain.id)
-    setTimeout(() => setCopiedToken(null), 2000)
-  }
-
-  const getStatusIcon = (status: string, isVerified: boolean) => {
-    if (isVerified) {
-      return <CheckCircle2 className="w-5 h-5 text-green-500" />
-    }
+  const getStatusIcon = (status: string) => {
     switch (status) {
       case "active":
         return <CheckCircle2 className="w-5 h-5 text-green-500" />
@@ -130,20 +93,33 @@ export function DomainManagement() {
     }
   }
 
-  const getStatusText = (status: string, isVerified: boolean) => {
-    if (isVerified && status === "active") return "Activo"
-    if (isVerified) return "Verificado"
+  const getStatusText = (status: string) => {
     switch (status) {
       case "pending":
-        return "Pendiente de verificacion"
+        return "Pendiente de aprobacion"
       case "active":
         return "Activo"
       case "failed":
-        return "Verificacion fallida"
+        return "Rechazado"
       case "suspended":
         return "Suspendido"
       default:
         return status
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "active":
+        return "bg-green-500/20 text-green-400 border-green-500/30"
+      case "pending":
+        return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30"
+      case "failed":
+        return "bg-red-500/20 text-red-400 border-red-500/30"
+      case "suspended":
+        return "bg-orange-500/20 text-orange-400 border-orange-500/30"
+      default:
+        return "bg-zinc-500/20 text-zinc-400 border-zinc-500/30"
     }
   }
 
@@ -165,7 +141,7 @@ export function DomainManagement() {
           Mis Dominios
         </CardTitle>
         <CardDescription className="text-zinc-400">
-          Agrega y gestiona los dominios donde se mostrara tu contenido
+          Agrega dominios para acceder a tus posts desde diferentes URLs
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -210,120 +186,50 @@ export function DomainManagement() {
             <p className="text-sm text-zinc-600 mt-1">Agrega tu primer dominio para comenzar</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {domains.map((domain) => (
               <div 
                 key={domain.id} 
-                className="p-4 bg-zinc-800 rounded-lg space-y-3"
+                className="p-4 bg-zinc-800 rounded-lg flex items-center justify-between"
               >
-                {/* Domain header */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {getStatusIcon(domain.status, domain.isVerified)}
-                    <div>
-                      <h3 className="font-medium text-zinc-100">{domain.domain}</h3>
-                      <p className="text-sm text-zinc-500">
-                        {getStatusText(domain.status, domain.isVerified)}
-                        {domain.sslEnabled && (
-                          <span className="ml-2 inline-flex items-center gap-1 text-green-500">
-                            <Shield className="w-3 h-3" /> SSL
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => deleteDomain(domain.id)}
-                    className="border-red-600 bg-transparent hover:bg-red-600/20 text-red-400"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-
-                {/* Verification instructions for pending domains */}
-                {!domain.isVerified && domain.status === "pending" && (
-                  <div className="p-3 bg-zinc-900 rounded-lg space-y-3">
-                    <p className="text-sm text-zinc-400">
-                      Para verificar este dominio, agrega el siguiente registro TXT en tu DNS:
-                    </p>
-                    
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-zinc-500">Nombre/Host:</span>
-                        <code className="text-xs bg-zinc-700 px-2 py-1 rounded text-blue-400">
-                          _videosystem
-                        </code>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-zinc-500">Tipo:</span>
-                        <code className="text-xs bg-zinc-700 px-2 py-1 rounded text-blue-400">
-                          TXT
-                        </code>
-                      </div>
-                      
-                      <div className="space-y-1">
-                        <span className="text-xs text-zinc-500">Valor:</span>
-                        <div className="flex items-center gap-2">
-                          <code className="text-xs bg-zinc-700 px-2 py-1 rounded text-green-400 break-all flex-1">
-                            videosystem-verify={domain.verificationToken}
-                          </code>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => copyVerificationToken(domain)}
-                            className="border-zinc-600 bg-transparent hover:bg-zinc-700 text-zinc-300 flex-shrink-0"
-                          >
-                            {copiedToken === domain.id ? (
-                              <CheckCircle2 className="w-4 h-4 text-green-500" />
-                            ) : (
-                              <Copy className="w-4 h-4" />
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <Button
-                      onClick={() => verifyDomain(domain.id)}
-                      disabled={verifyingId === domain.id}
-                      className="w-full bg-green-600 hover:bg-green-700 text-white"
-                    >
-                      {verifyingId === domain.id ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                          Verificando...
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="w-4 h-4 mr-2" />
-                          Verificar Dominio
-                        </>
+                <div className="flex items-center gap-3">
+                  {getStatusIcon(domain.status)}
+                  <div>
+                    <h3 className="font-medium text-zinc-100">{domain.domain}</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`text-xs px-2 py-0.5 rounded border ${getStatusColor(domain.status)}`}>
+                        {getStatusText(domain.status)}
+                      </span>
+                      {domain.status === "active" && (
+                        <span className="text-xs text-zinc-500">
+                          Usa: {domain.domain}/?p=ID
+                        </span>
                       )}
-                    </Button>
-
-                    <p className="text-xs text-zinc-500">
-                      Los cambios de DNS pueden tardar hasta 48 horas en propagarse
-                    </p>
+                    </div>
                   </div>
-                )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => deleteDomain(domain.id)}
+                  className="border-red-600 bg-transparent hover:bg-red-600/20 text-red-400"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
               </div>
             ))}
           </div>
         )}
 
-        {/* Help section */}
+        {/* Info section */}
         <div className="p-4 bg-blue-900/20 border border-blue-800/50 rounded-lg">
           <h4 className="text-sm font-medium text-blue-400 mb-2">Como funciona</h4>
-          <ol className="text-xs text-zinc-400 space-y-1 list-decimal list-inside">
-            <li>Agrega tu dominio (ej: mivideo.com)</li>
-            <li>Copia el registro TXT y agregalo en tu proveedor de DNS</li>
-            <li>Espera la propagacion del DNS (puede tardar hasta 48 horas)</li>
-            <li>Haz clic en "Verificar Dominio" para confirmar</li>
-            <li>Una vez verificado, configura un CNAME apuntando a tu servidor</li>
-          </ol>
+          <ul className="text-xs text-zinc-400 space-y-1 list-disc list-inside">
+            <li>Agrega el dominio que deseas usar</li>
+            <li>El administrador aprobara tu dominio manualmente</li>
+            <li>Una vez activo, podras acceder a tus posts desde ese dominio</li>
+            <li>Ejemplo: <code className="bg-zinc-800 px-1 rounded">tudominio.com/?p=123</code></li>
+          </ul>
         </div>
       </CardContent>
     </Card>
