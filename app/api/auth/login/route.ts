@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const cookieStore = await cookies()
     cookieStore.set('auth_token', result.token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: false, // Allow HTTP for Hetzner deployment
       sameSite: 'lax',
       maxAge: 30 * 24 * 60 * 60, // 30 days
       path: '/',
@@ -28,7 +28,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ 
       user: { 
         id: result.user.id, 
-        email: result.user.email 
+        email: result.user.email,
+        role: (result.user as { role?: string }).role || 'user'
       } 
     })
   } catch (error) {
