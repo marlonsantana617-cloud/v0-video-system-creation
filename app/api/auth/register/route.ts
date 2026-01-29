@@ -1,6 +1,5 @@
+import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { createUser, createSession } from '@/lib/auth'
-import { cookies } from 'next/headers'
 
 export async function POST(request: Request) {
   try {
@@ -14,28 +13,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Password debe tener al menos 6 caracteres' }, { status: 400 })
     }
 
-    const user = await createUser(email, password)
+    const supabase = await createClient()
     
-    if (!user) {
-      return NextResponse.json({ error: 'El email ya esta registrado' }, { status: 400 })
-    }
-
-    const token = await createSession(user.id)
-
-    const cookieStore = await cookies()
-    cookieStore.set('auth_token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60, // 30 days
-      path: '/',
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/admin`,
+        data: {
+          role: 'user'
+        }
+      }
     })
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
 
     return NextResponse.json({ 
       user: { 
-        id: user.id, 
-        email: user.email 
-      } 
+        id: data.user?.id, 
+        email: data.user?.email,
+        role: 'user'
+      },
+      message: 'Registro exitoso. Revisa tu email para confirmar tu cuenta.'
     })
   } catch (error) {
     console.error('Register error:', error)

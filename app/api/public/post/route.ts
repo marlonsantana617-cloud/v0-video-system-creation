@@ -1,28 +1,5 @@
+import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { query, queryOne } from '@/lib/db'
-
-interface Post {
-  id: number
-  user_id: string
-  title: string
-  video_url: string
-  thumbnail_url: string
-  is_hls: boolean
-}
-
-interface UserSettings {
-  floating_buttons: string
-  redirect: string
-  counter: string
-  scripts: string
-}
-
-interface UserDomain {
-  id: number
-  user_id: string
-  domain: string
-  status: string
-}
 
 export async function GET(request: Request) {
   try {
@@ -31,41 +8,42 @@ export async function GET(request: Request) {
     
     // Obtener el dominio desde el header Host
     const host = request.headers.get('host') || ''
-    const domain = host.replace(/^www\./, '').split(':')[0] // Quitar www. y puerto
+    const domain = host.replace(/^www\./, '').split(':')[0]
 
     if (!postId) {
       return NextResponse.json({ error: 'ID requerido' }, { status: 400 })
     }
 
-    // Buscar el dominio en la base de datos para obtener el user_id
-    const userDomain = await queryOne<UserDomain>(
-      'SELECT * FROM user_domains WHERE domain = ? AND status = ?',
-      [domain, 'active']
-    )
+    const supabase = await createClient()
 
-    let userId: string | null = null
+    // Buscar el dominio en la base de datos
+    const { data: userDomain } = await supabase
+      .from('user_domains')
+      .select('*')
+      .eq('domain', domain)
+      .eq('status', 'active')
+      .single()
 
-    if (userDomain) {
-      // Si encontramos el dominio, usamos el user_id del dominio
-      userId = userDomain.user_id
-    }
+    let userId: string | null = userDomain?.user_id || null
 
     // Get post
-    let post: Post | null = null
+    let post = null
 
     if (userId) {
-      // Buscar el post que pertenece al usuario del dominio
-      post = await queryOne<Post>(
-        'SELECT * FROM posts WHERE id = ? AND user_id = ?',
-        [postId, userId]
-      )
+      const { data } = await supabase
+        .from('posts')
+        .select('*')
+        .eq('id', postId)
+        .eq('user_id', userId)
+        .single()
+      post = data
     } else {
-      // Si no hay dominio registrado, buscar el post sin filtrar por usuario
-      // (para desarrollo local o dominio principal)
-      post = await queryOne<Post>(
-        'SELECT * FROM posts WHERE id = ?',
-        [postId]
-      )
+      const { data } = await supabase
+        .from('posts')
+        .select('*')
+        .eq('id', postId)
+        .single()
+      post = data
     }
 
     if (!post) {
@@ -73,16 +51,18 @@ export async function GET(request: Request) {
     }
 
     // Get user settings
-    const settings = await queryOne<UserSettings>(
-      'SELECT * FROM user_settings WHERE id = ?',
-      [post.user_id]
-    )
+    const { data: settings } = await supabase
+      .from('user_settings')
+      .select('*')
+      .eq('id', post.user_id)
+      .single()
 
-    // Get other posts from same user (for random redirect at end)
-    const otherPosts = await query<{ id: number }>(
-      'SELECT id FROM posts WHERE user_id = ? AND id != ?',
-      [post.user_id, postId]
-    )
+    // Get other posts from same user
+    const { data: otherPosts } = await supabase
+      .from('posts')
+      .select('id')
+      .eq('user_id', post.user_id)
+      .neq('id', postId)
 
     return NextResponse.json({
       post: {
@@ -94,18 +74,18 @@ export async function GET(request: Request) {
         userId: post.user_id
       },
       settings: settings ? {
-        floatingButtons: JSON.parse(settings.floating_buttons || '[]'),
-        redirect: JSON.parse(settings.redirect || '{}'),
-        counter: JSON.parse(settings.counter || '{}'),
-        scripts: JSON.parse(settings.scripts || '[]')
+        floatingButtons: settings.floating_buttons || [],
+        redirect: settings.redirect || {},
+        counter: settings.counter || {},
+        scripts: settings.scripts || []
       } : {
         floatingButtons: [],
         redirect: {},
         counter: {},
         scripts: []
       },
-      otherPosts: otherPosts.map(p => p.id),
-      domain: userDomain ? userDomain.domain : null
+      otherPosts: otherPosts?.map(p => p.id) || [],
+      domain: userDomain?.domain || null
     })
   } catch (error) {
     console.error('Get public post error:', error)

@@ -1,35 +1,40 @@
+import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { getCurrentUser } from '@/lib/auth'
-import { query, queryOne } from '@/lib/db'
-
-interface UserSettings {
-  id: string
-  floating_buttons: string
-  redirect: string
-  counter: string
-  scripts: string
-}
 
 // Get settings for current user
 export async function GET() {
   try {
-    const user = await getCurrentUser()
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
     if (!user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const settings = await queryOne<UserSettings>(
-      'SELECT * FROM user_settings WHERE id = ?',
-      [user.id]
-    )
+    const { data: settings, error } = await supabase
+      .from('user_settings')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+
+    if (error && error.code !== 'PGRST116') throw error
 
     if (!settings) {
       // Create default settings
-      await query(
-        `INSERT INTO user_settings (id, floating_buttons, redirect, counter, scripts) 
-         VALUES (?, '[]', '{}', '{}', '[]')`,
-        [user.id]
-      )
+      const { data: newSettings, error: insertError } = await supabase
+        .from('user_settings')
+        .insert({
+          id: user.id,
+          floating_buttons: [],
+          redirect: {},
+          counter: {},
+          scripts: []
+        })
+        .select()
+        .single()
+
+      if (insertError) throw insertError
+
       return NextResponse.json({ 
         settings: {
           floatingButtons: [],
@@ -42,10 +47,10 @@ export async function GET() {
 
     return NextResponse.json({ 
       settings: {
-        floatingButtons: JSON.parse(settings.floating_buttons || '[]'),
-        redirect: JSON.parse(settings.redirect || '{}'),
-        counter: JSON.parse(settings.counter || '{}'),
-        scripts: JSON.parse(settings.scripts || '[]')
+        floatingButtons: settings.floating_buttons || [],
+        redirect: settings.redirect || {},
+        counter: settings.counter || {},
+        scripts: settings.scripts || []
       }
     })
   } catch (error) {
@@ -57,25 +62,27 @@ export async function GET() {
 // Update settings
 export async function PUT(request: Request) {
   try {
-    const user = await getCurrentUser()
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
     if (!user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
     const { floatingButtons, redirect, counter, scripts } = await request.json()
 
-    await query(
-      `UPDATE user_settings 
-       SET floating_buttons = ?, redirect = ?, counter = ?, scripts = ?, updated_at = NOW()
-       WHERE id = ?`,
-      [
-        JSON.stringify(floatingButtons || []),
-        JSON.stringify(redirect || {}),
-        JSON.stringify(counter || {}),
-        JSON.stringify(scripts || []),
-        user.id
-      ]
-    )
+    const { error } = await supabase
+      .from('user_settings')
+      .upsert({
+        id: user.id,
+        floating_buttons: floatingButtons || [],
+        redirect: redirect || {},
+        counter: counter || {},
+        scripts: scripts || [],
+        updated_at: new Date().toISOString()
+      })
+
+    if (error) throw error
 
     return NextResponse.json({ success: true })
   } catch (error) {

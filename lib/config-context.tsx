@@ -6,6 +6,7 @@ import { type SystemConfig, type Post, type GlobalSettings, defaultSystemConfig,
 interface User {
   id: string
   email: string
+  role?: 'admin' | 'user'
 }
 
 interface ConfigContextType {

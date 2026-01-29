@@ -1,7 +1,7 @@
 import { Suspense } from "react"
 import { Metadata } from "next"
 import { VideoPage } from "@/components/video/video-page"
-import { queryOne } from "@/lib/db"
+import { createClient } from "@/lib/supabase/server"
 
 interface Post {
   id: number
@@ -26,10 +26,12 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
   }
 
   // Fetch post data
-  const post = await queryOne<Post>(
-    "SELECT * FROM posts WHERE id = ?",
-    [parseInt(postId)]
-  )
+  const supabase = await createClient()
+  const { data: post } = await supabase
+    .from('posts')
+    .select('*')
+    .eq('id', parseInt(postId))
+    .single<Post>()
 
   if (!post) {
     return {

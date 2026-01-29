@@ -17,7 +17,6 @@ import { Key, Check, AlertCircle } from "lucide-react"
 
 export function ChangePassword() {
   const [open, setOpen] = useState(false)
-  const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [loading, setLoading] = useState(false)
@@ -45,10 +44,7 @@ export function ChangePassword() {
       const res = await fetch('/api/auth/change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          currentPassword,
-          newPassword
-        })
+        body: JSON.stringify({ newPassword })
       })
 
       const data = await res.json()
@@ -60,7 +56,6 @@ export function ChangePassword() {
       }
 
       setSuccess(true)
-      setCurrentPassword("")
       setNewPassword("")
       setConfirmPassword("")
 
@@ -79,7 +74,6 @@ export function ChangePassword() {
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen)
     if (!isOpen) {
-      setCurrentPassword("")
       setNewPassword("")
       setConfirmPassword("")
       setError(null)
@@ -94,15 +88,15 @@ export function ChangePassword() {
           variant="outline" 
           className="border-zinc-700 bg-transparent hover:bg-zinc-800 text-zinc-300"
         >
-          <Key className="w-4 h-4 mr-2" />
-          Cambiar Clave
+          <Key className="w-4 h-4 md:mr-2" />
+          <span className="hidden md:inline">Cambiar Clave</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100">
         <DialogHeader>
           <DialogTitle>Cambiar Contrasena</DialogTitle>
           <DialogDescription className="text-zinc-400">
-            Ingresa tu contrasena actual y la nueva contrasena
+            Ingresa tu nueva contrasena
           </DialogDescription>
         </DialogHeader>
 
@@ -115,18 +109,6 @@ export function ChangePassword() {
           </div>
         ) : (
           <form onSubmit={handleChangePassword} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="currentPassword" className="text-zinc-300">Contrasena Actual</Label>
-              <Input
-                id="currentPassword"
-                type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                required
-                className="bg-zinc-800 border-zinc-700 text-zinc-100"
-              />
-            </div>
-
             <div className="space-y-2">
               <Label htmlFor="newPassword" className="text-zinc-300">Nueva Contrasena</Label>
               <Input

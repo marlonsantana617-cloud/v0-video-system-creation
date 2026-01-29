@@ -1,162 +1,114 @@
-import { NextRequest, NextResponse } from "next/server"
-import { query } from "@/lib/db"
-import { verifySession } from "@/lib/auth"
-
-interface DomainRow {
-  id: number
-  user_id: string
-  domain: string
-  is_verified: number
-  verification_token: string | null
-  ssl_enabled: number
-  status: string
-  created_at: string
-  updated_at: string
-}
+import { createClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
 
 // GET - List user domains
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const sessionToken = request.cookies.get("session_token")?.value
-    if (!sessionToken) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
-    }
-
-    const user = await verifySession(sessionToken)
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
     if (!user) {
-      return NextResponse.json({ error: "Sesion invalida" }, { status: 401 })
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const domains = await query<DomainRow>(
-      "SELECT * FROM user_domains WHERE user_id = ? ORDER BY created_at DESC",
-      [user.id]
-    )
+    const { data: domains, error } = await supabase
+      .from('user_domains')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
 
-    const formattedDomains = domains.map(d => ({
-      id: d.id,
-      userId: d.user_id,
-      domain: d.domain,
-      isVerified: Boolean(d.is_verified),
-      verificationToken: d.verification_token,
-      sslEnabled: Boolean(d.ssl_enabled),
-      status: d.status,
-      createdAt: d.created_at,
-      updatedAt: d.updated_at
-    }))
+    if (error) throw error
 
-    return NextResponse.json({ domains: formattedDomains })
+    return NextResponse.json({ domains })
   } catch (error) {
-    console.error("Error fetching domains:", error)
-    return NextResponse.json({ error: "Error interno" }, { status: 500 })
+    console.error('Get domains error:', error)
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }
 
 // POST - Add new domain
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const sessionToken = request.cookies.get("session_token")?.value
-    if (!sessionToken) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
-    }
-
-    const user = await verifySession(sessionToken)
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
     if (!user) {
-      return NextResponse.json({ error: "Sesion invalida" }, { status: 401 })
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
     const { domain } = await request.json()
 
     if (!domain) {
-      return NextResponse.json({ error: "Dominio requerido" }, { status: 400 })
+      return NextResponse.json({ error: 'Dominio requerido' }, { status: 400 })
     }
 
     // Validate domain format
     const domainRegex = /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/
-    const cleanDomain = domain.toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, "").replace(/\/.*$/, "")
+    const cleanDomain = domain.toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/.*$/, '')
     
     if (!domainRegex.test(cleanDomain)) {
-      return NextResponse.json({ error: "Formato de dominio invalido" }, { status: 400 })
+      return NextResponse.json({ error: 'Formato de dominio invalido' }, { status: 400 })
     }
 
     // Check if domain already exists
-    const existing = await query<DomainRow>(
-      "SELECT id FROM user_domains WHERE domain = ?",
-      [cleanDomain]
-    )
+    const { data: existing } = await supabase
+      .from('user_domains')
+      .select('id')
+      .eq('domain', cleanDomain)
+      .single()
 
-    if (existing.length > 0) {
-      return NextResponse.json({ error: "Este dominio ya esta registrado" }, { status: 400 })
+    if (existing) {
+      return NextResponse.json({ error: 'Este dominio ya esta registrado' }, { status: 400 })
     }
 
-    // Insert domain - activo automaticamente
-    await query(
-      `INSERT INTO user_domains (user_id, domain, status) 
-       VALUES (?, ?, 'active')`,
-      [user.id, cleanDomain]
-    )
+    // Insert domain
+    const { data: newDomain, error } = await supabase
+      .from('user_domains')
+      .insert({
+        user_id: user.id,
+        domain: cleanDomain,
+        status: 'active'
+      })
+      .select()
+      .single()
 
-    // Get the inserted domain
-    const [newDomain] = await query<DomainRow>(
-      "SELECT * FROM user_domains WHERE domain = ?",
-      [cleanDomain]
-    )
+    if (error) throw error
 
-    return NextResponse.json({
-      success: true,
-      domain: {
-        id: newDomain.id,
-        userId: newDomain.user_id,
-        domain: newDomain.domain,
-        isVerified: Boolean(newDomain.is_verified),
-        verificationToken: newDomain.verification_token,
-        sslEnabled: Boolean(newDomain.ssl_enabled),
-        status: newDomain.status,
-        createdAt: newDomain.created_at,
-        updatedAt: newDomain.updated_at
-      }
-    })
+    return NextResponse.json({ success: true, domain: newDomain })
   } catch (error) {
-    console.error("Error adding domain:", error)
-    return NextResponse.json({ error: "Error interno" }, { status: 500 })
+    console.error('Add domain error:', error)
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }
 
 // DELETE - Remove domain
-export async function DELETE(request: NextRequest) {
+export async function DELETE(request: Request) {
   try {
-    const sessionToken = request.cookies.get("session_token")?.value
-    if (!sessionToken) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
-    }
-
-    const user = await verifySession(sessionToken)
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
     if (!user) {
-      return NextResponse.json({ error: "Sesion invalida" }, { status: 401 })
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
     const { searchParams } = new URL(request.url)
-    const domainId = searchParams.get("id")
+    const domainId = searchParams.get('id')
 
     if (!domainId) {
-      return NextResponse.json({ error: "ID de dominio requerido" }, { status: 400 })
+      return NextResponse.json({ error: 'ID de dominio requerido' }, { status: 400 })
     }
 
-    // Verify domain belongs to user
-    const [domain] = await query<DomainRow>(
-      "SELECT * FROM user_domains WHERE id = ? AND user_id = ?",
-      [domainId, user.id]
-    )
+    const { error } = await supabase
+      .from('user_domains')
+      .delete()
+      .eq('id', domainId)
+      .eq('user_id', user.id)
 
-    if (!domain) {
-      return NextResponse.json({ error: "Dominio no encontrado" }, { status: 404 })
-    }
-
-    // Delete domain
-    await query("DELETE FROM user_domains WHERE id = ?", [domainId])
+    if (error) throw error
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Error deleting domain:", error)
-    return NextResponse.json({ error: "Error interno" }, { status: 500 })
+    console.error('Delete domain error:', error)
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }
