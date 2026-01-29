@@ -1,8 +1,12 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { type SystemConfig, type Post, type GlobalSettings, defaultSystemConfig, defaultFloatingButtons, defaultRedirect, defaultCounter } from '@/lib/types'
+
+interface User {
+  id: string
+  email: string
+}
 
 interface ConfigContextType {
   config: SystemConfig
@@ -14,6 +18,10 @@ interface ConfigContextType {
   saveConfig: () => Promise<void>
   isLoading: boolean
   userId: string | null
+  user: User | null
+  login: (email: string, password: string) => Promise<boolean>
+  register: (email: string, password: string) => Promise<boolean>
+  logout: () => Promise<void>
 }
 
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined)
@@ -22,65 +30,118 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const [config, setConfig] = useState<SystemConfig>(defaultSystemConfig)
   const [isLoading, setIsLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
-  const supabase = createClient()
+  const [user, setUser] = useState<User | null>(null)
 
-  // Load data from Supabase
+  // Check auth status and load data
   useEffect(() => {
     const loadData = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user) {
-        setIsLoading(false)
-        return
+      try {
+        // Check if user is logged in
+        const userRes = await fetch('/api/auth/user')
+        const userData = await userRes.json()
+        
+        if (!userData.user) {
+          setIsLoading(false)
+          return
+        }
+        
+        setUser(userData.user)
+        setUserId(userData.user.id)
+
+        // Load user settings
+        const settingsRes = await fetch('/api/settings')
+        const settingsData = await settingsRes.json()
+
+        // Load user posts
+        const postsRes = await fetch('/api/posts')
+        const postsData = await postsRes.json()
+
+        // Build config from database
+        const settings: GlobalSettings = settingsData.settings ? {
+          siteTitle: 'Video Player',
+          siteDescription: 'Watch videos online',
+          floatingButtons: settingsData.settings.floatingButtons || defaultFloatingButtons,
+          redirect: { ...defaultRedirect, ...(settingsData.settings.redirect || {}) },
+          counter: { ...defaultCounter, ...(settingsData.settings.counter || {}) },
+          scripts: settingsData.settings.scripts || [],
+        } : defaultSystemConfig.settings
+
+        const posts: Post[] = (postsData.posts || []).map((p: { id: number; title: string; video_url: string; thumbnail_url: string; is_hls: boolean; created_at: string; updated_at: string; videoUrl?: string; thumbnailUrl?: string; isHLS?: boolean; createdAt?: string; updatedAt?: string }) => ({
+          id: p.id,
+          title: p.title,
+          videoUrl: p.video_url || p.videoUrl,
+          thumbnailUrl: p.thumbnail_url || p.thumbnailUrl || '',
+          isHLS: p.is_hls ?? p.isHLS,
+          createdAt: p.created_at || p.createdAt,
+          updatedAt: p.updated_at || p.updatedAt,
+        }))
+
+        setConfig({
+          settings,
+          posts,
+          nextPostId: posts.length > 0 ? Math.max(...posts.map(p => p.id)) + 1 : 1,
+        })
+      } catch (error) {
+        console.error('Error loading data:', error)
       }
-      
-      setUserId(user.id)
-
-      // Load user settings
-      const { data: settingsData } = await supabase
-        .from('user_settings')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-
-      // Load user posts (newest first)
-      const { data: postsData } = await supabase
-        .from('posts')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('id', { ascending: false })
-
-      // Build config from database
-      const settings: GlobalSettings = settingsData ? {
-        siteTitle: 'Video Player',
-        siteDescription: 'Watch videos online',
-        floatingButtons: settingsData.floating_buttons || defaultFloatingButtons,
-        redirect: { ...defaultRedirect, ...(settingsData.redirect || {}) },
-        counter: { ...defaultCounter, ...(settingsData.counter || {}) },
-        scripts: settingsData.scripts || [],
-      } : defaultSystemConfig.settings
-
-      const posts: Post[] = (postsData || []).map(p => ({
-        id: p.id,
-        title: p.title,
-        videoUrl: p.video_url,
-        thumbnailUrl: p.thumbnail_url || '',
-        isHLS: p.is_hls,
-        createdAt: p.created_at,
-        updatedAt: p.updated_at,
-      }))
-
-      setConfig({
-        settings,
-        posts,
-        nextPostId: posts.length > 0 ? Math.max(...posts.map(p => p.id)) + 1 : 1,
-      })
       
       setIsLoading(false)
     }
 
     loadData()
   }, [])
+
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+      
+      if (!res.ok) return false
+      
+      const data = await res.json()
+      setUser(data.user)
+      setUserId(data.user.id)
+      
+      // Reload page to load user data
+      window.location.reload()
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  const register = async (email: string, password: string): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+      
+      if (!res.ok) return false
+      
+      const data = await res.json()
+      setUser(data.user)
+      setUserId(data.user.id)
+      
+      // Reload page to load user data
+      window.location.reload()
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  const logout = async (): Promise<void> => {
+    await fetch('/api/auth/logout', { method: 'POST' })
+    setUser(null)
+    setUserId(null)
+    setConfig(defaultSystemConfig)
+    window.location.href = '/auth/login'
+  }
 
   const updateSettings = (settings: Partial<GlobalSettings>) => {
     setConfig(prev => ({
@@ -92,39 +153,42 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const createPost = async (): Promise<Post | null> => {
     if (!userId) return null
 
-    const { data, error } = await supabase
-      .from('posts')
-      .insert({
-        user_id: userId,
-        title: '',
-        video_url: '',
-        is_hls: false,
+    try {
+      const res = await fetch('/api/posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: '',
+          videoUrl: '',
+          isHLS: false,
+        }),
       })
-      .select()
-      .single()
 
-    if (error || !data) {
+      if (!res.ok) return null
+
+      const { post: data } = await res.json()
+
+      const newPost: Post = {
+        id: data.id,
+        title: data.title,
+        videoUrl: data.video_url || data.videoUrl || '',
+        thumbnailUrl: data.thumbnail_url || data.thumbnailUrl || '',
+        isHLS: data.is_hls ?? data.isHLS ?? false,
+        createdAt: data.created_at || data.createdAt,
+        updatedAt: data.updated_at || data.updatedAt,
+      }
+
+      // Add new post at the beginning (newest first)
+      setConfig(prev => ({
+        ...prev,
+        posts: [newPost, ...prev.posts],
+      }))
+
+      return newPost
+    } catch (error) {
       console.error('Error creating post:', error)
       return null
     }
-
-    const newPost: Post = {
-      id: data.id,
-      title: data.title,
-      videoUrl: data.video_url,
-      thumbnailUrl: data.thumbnail_url || '',
-      isHLS: data.is_hls,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
-    }
-
-    // Add new post at the beginning (newest first)
-    setConfig(prev => ({
-      ...prev,
-      posts: [newPost, ...prev.posts],
-    }))
-
-    return newPost
   }
 
   const updatePost = (postId: number, updates: Partial<Post>) => {
@@ -139,7 +203,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   }
 
   const deletePost = async (postId: number) => {
-    await supabase.from('posts').delete().eq('id', postId)
+    await fetch(`/api/posts?id=${postId}`, { method: 'DELETE' })
     
     setConfig(prev => ({
       ...prev,
@@ -154,34 +218,27 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const saveConfig = async () => {
     if (!userId) return
 
-    // Save settings
-    const { error: settingsError } = await supabase
-      .from('user_settings')
-      .upsert({
-        id: userId,
-        floating_buttons: config.settings.floatingButtons,
-        redirect: config.settings.redirect,
-        counter: config.settings.counter,
-        scripts: config.settings.scripts,
-        updated_at: new Date().toISOString(),
+    try {
+      // Save settings
+      await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          floatingButtons: config.settings.floatingButtons,
+          redirect: config.settings.redirect,
+          counter: config.settings.counter,
+          scripts: config.settings.scripts,
+        }),
       })
 
-    if (settingsError) {
-      console.error('Error saving settings:', settingsError)
-    }
-
-    // Save all posts
-    for (const post of config.posts) {
-      await supabase
-        .from('posts')
-        .update({
-          title: post.title,
-          video_url: post.videoUrl,
-          thumbnail_url: post.thumbnailUrl || '',
-          is_hls: post.isHLS,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', post.id)
+      // Save all posts
+      await fetch('/api/posts', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ posts: config.posts }),
+      })
+    } catch (error) {
+      console.error('Error saving config:', error)
     }
   }
 
@@ -196,6 +253,10 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       saveConfig, 
       isLoading,
       userId,
+      user,
+      login,
+      register,
+      logout,
     }}>
       {children}
     </ConfigContext.Provider>

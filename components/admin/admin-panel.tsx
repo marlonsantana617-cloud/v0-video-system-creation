@@ -1,9 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { SelectItem } from "@/components/ui/select"
+import { SelectContent } from "@/components/ui/select"
+import { SelectValue } from "@/components/ui/select"
+import { SelectTrigger } from "@/components/ui/select"
+import { Select } from "@/components/ui/select"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useConfig } from "@/lib/config-context"
-import { createClient } from "@/lib/supabase/client"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,54 +15,28 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { UserManagement } from "./user-management"
-import { ChangePassword } from "./change-password"
 import { ThumbnailCapture } from "./thumbnail-capture"
 import { 
   Settings, Video, Share2, Link2, BarChart3, Code, Save, 
-  Plus, Trash2, Copy, ExternalLink, Edit2, Play, Users, LogOut
+  Plus, Trash2, Copy, ExternalLink, Edit2, Play, LogOut
 } from "lucide-react"
+import { ChangePassword } from "./change-password"
+import { Users } from "lucide-react"
+import { UserManagement } from "./user-management"
 
 export function AdminPanel() {
   const configContext = useConfig()
-  const { config, updateSettings, createPost, updatePost, deletePost, saveConfig, isLoading } = configContext
+  const { config, updateSettings, createPost, updatePost, deletePost, saveConfig, isLoading, user, logout } = configContext
   const [saved, setSaved] = useState(false)
   const [copiedUrl, setCopiedUrl] = useState<number | null>(null)
   const [editingPost, setEditingPost] = useState<number | null>(null)
-  const [isAdmin, setIsAdmin] = useState(false)
-  const [userEmail, setUserEmail] = useState<string | null>(null)
   const router = useRouter()
-  const supabase = createClient()
-
-  useEffect(() => {
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        setUserEmail(user.email || null)
-        
-        // Check user_metadata from auth (JWT)
-        const roleFromMeta = user.user_metadata?.role
-        
-        // Also check users table
-        const { data } = await supabase
-          .from("users")
-          .select("role")
-          .eq("id", user.id)
-          .single()
-        
-        // User is admin if either metadata or table says so
-        const isAdminUser = data?.role === "admin" || roleFromMeta === "admin"
-        setIsAdmin(isAdminUser)
-      }
-    }
-    checkUser()
-  }, [])
+  const userEmail = user?.email || ""
+  const isAdmin = user?.role === "admin"
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
+    await logout()
     router.push("/auth/login")
-    router.refresh()
   }
 
   if (isLoading) {
@@ -77,13 +55,13 @@ export function AdminPanel() {
     )
   }
 
-const handleSave = async () => {
+  const handleSave = async () => {
     await saveConfig()
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
 
-const handleCreatePost = async () => {
+  const handleCreatePost = async () => {
     const post = await createPost()
     if (post) {
       setEditingPost(post.id)
